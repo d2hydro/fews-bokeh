@@ -1,1 +1,1 @@
-# fews-rest-client
+# bokeh-fews
