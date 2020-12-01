@@ -1,0 +1,9 @@
+name: bokehfews
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - bokeh
+  - pandas
