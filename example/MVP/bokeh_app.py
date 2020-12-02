@@ -26,8 +26,8 @@ import json
 url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
 thinner = None
 map_buffer = 1000
-start_time = pd.Timestamp(year=2000,month=1,day=1)
-now = pd.Timestamp.now()
+start_time = pd.Timestamp(year=2020,month=1,day=1)
+end_time = pd.Timestamp.now()
 
 
 def screen_resolution():
@@ -45,17 +45,15 @@ def update_plot_from_geo(event):
     gdf_dist = gdf.loc[gdf['distance'] < distance_threshold]
     if not gdf_dist.empty:
         location_id = gdf_dist.sort_values('distance').iloc[0]['locationId']
-        print(f'{location_id} {x} {y}')
 
         df = fews_rest.get_timeseries(url,
                                       locationIds = location_id,
                                       parameterIds = 'H.meting',
-                                      startTime = '2020-09-01T00:00:00Z',
-                                      endTime = '2020-11-01T00:00:00Z',
+                                      startTime = start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                      endTime = end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
                                       thinning = thinner)
         
         if not df is None:
-            print(f'{df["value"].min()}, {df["value"].max()}')
     
             src = ColumnDataSource(data=df)
             time_src.data.update(src.data)
@@ -82,10 +80,10 @@ geo_src = GeoJSONDataSource(geojson=gdf.to_json())
 
 width,height = screen_resolution()
 
-timespan = (now - start_time).days
+timespan = (end_time - start_time).days
 thinner = int(timespan * 86400 * 1000 / width)
 
-time_x_range = Range1d(start=start_time, end=now, bounds=None)
+time_x_range = Range1d(start=start_time, end=end_time, bounds=None)
 time_y_range = Range1d(start=0, end=1, bounds=None)
 
 time_fig = figure(title = time_df.location,

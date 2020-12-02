@@ -10,10 +10,7 @@ import requests
 _geodatum = {'WGS 1984':'epsg:4326',
              'Rijks Driehoekstelsel':'epsg:28992'}
 
-def _time_series2gdf(json):
-    print(json)
-    
-    
+   
 def get_locations(url,documentFormat='PI_JSON',showAttributes=False,filterId=None,documentVersion='1.26'):
     rest_url = f'{url}locations'
     
@@ -35,7 +32,8 @@ def get_locations(url,documentFormat='PI_JSON',showAttributes=False,filterId=Non
         
     return gdf
 
-def get_timeseries(url,locationIds,parameterIds,startTime,endTime,documentFormat='PI_JSON',documentVersion='1.23',thinning=None):
+def get_timeseries(url,locationIds,parameterIds,startTime,endTime,documentFormat='PI_JSON',documentVersion='1.23',thinning=None,onlyHeaders=False):
+    start = pd.Timestamp.now()
     rest_url = f'{url}timeseries'
     
     parameters = dict(locationIds=locationIds,
@@ -44,13 +42,19 @@ def get_timeseries(url,locationIds,parameterIds,startTime,endTime,documentFormat
                       endTime=endTime,
                       documentFormat=documentFormat,
                       documentVersion=documentVersion,
+                      onlyHeaders=onlyHeaders,
                       thinning=thinning)
     
     response = requests.get(rest_url,parameters)
-    requests.get('https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/timeseries?documentFormat=PI_JSON&locationIds=PG_Oranjedorp_instroom&parameterIds=H.meting&startTime=2020-09-01T00:00:00Z&endTime=2020-11-01T00:00:00Z&documentVersion=1.23&thinning=5146875')
-
+    
+    delta = pd.Timestamp.now() - start
+    print(f'get timeseries in {delta.seconds + delta.microseconds/1000000}')
+    
     if response.status_code == 200:
-        if 'timeSeries' in response.json().keys():
+        if onlyHeaders:
+            return response.json()
+        
+        elif 'timeSeries' in response.json().keys():
             time_series = response.json()['timeSeries'][0]
             if 'events' in time_series.keys():
                 df = pd.DataFrame(time_series['events'])
