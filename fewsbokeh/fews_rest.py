@@ -48,7 +48,7 @@ def get_timeseries(url,locationIds,parameterIds,startTime,endTime,documentFormat
     response = requests.get(rest_url,parameters)
     
     delta = pd.Timestamp.now() - start
-    print(f'get timeseries in {delta.seconds + delta.microseconds/1000000}')
+    print(f'get timeseries in {delta.seconds + delta.microseconds/1000000} seconds (status: {response.status_code})')
     
     if response.status_code == 200:
         if onlyHeaders:
