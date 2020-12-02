@@ -22,6 +22,7 @@ from bokeh.tile_providers import get_provider, Vendors
 from shapely.geometry import Point
 import ctypes
 import json
+import re
 
 url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
 thinner = None
@@ -30,6 +31,8 @@ start_time = pd.Timestamp(year=2020,month=1,day=1)
 end_time = pd.Timestamp.now()
 filter_parent = 'Fluvial'
 filter_selected = 'HW_WVS'
+parameter_filter = '^((?!WNS).)*$'
+parameter_filter = '.*meetwaarde'
 
 #%%
 
@@ -44,63 +47,89 @@ def _update_map_select_src(location_id,gdf=None):
     if gdf is None:
         gdf = gpd.GeoDataFrame.from_features(json.loads(map_src.geojson)['features'])
         gdf.index = gdf['locationId']
-    x,y = [gdf.loc[location_id]['geometry'].x,gdf.loc[location_id]['geometry'].y]
-    map_select_src.data.update({'x':[x],'y':[y]})
+    x = list(gdf[gdf['locationId'].isin(location_id)]['geometry'].x.values)
+    y = list(gdf[gdf['locationId'].isin(location_id)]['geometry'].y.values)
+    #x,y = [gdf.loc[location_id]['geometry'].x,gdf.loc[location_id]['geometry'].y]
+    map_select_src.data.update({'x':x,'y':y})
+    #map_select_src.data.update({'x':[x],'y':[y]})
     
+    return x,y
+        
 
-def _update_map_time_fig(location_id):
-    df = fews_rest.get_timeseries(url,
-                              locationIds = location_id,
-                              parameterIds = 'H.meting',
-                              startTime = start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                              endTime = end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                              thinning = thinner)
-    
-    if not df is None:
-        src = ColumnDataSource(data=df)
-        time_src.data.update(src.data)
-        time_fig.title.text = df.location
-        time_x_range.start = df["datetime"].min()
-        time_x_range.end = df["datetime"].max()           
-        time_y_range.start = df["value"].min()
-        time_y_range.end = df["value"].max()
-        tabs.active = 1   
+def _update_time_fig(location_id,parameter_id):
+    if (len(location_id) > 0) and (len(parameter_id) > 0):
+        
+        df = rest.get_timeseries(
+                                  locationIds = location_id[0],
+                                  parameterIds = parameter_id[0],
+                                  startTime = start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                  endTime = end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                  thinning = thinner)
+        
+        if not df is None:
+            src = ColumnDataSource(data=df)
+            time_src.data.update(src.data)
+            time_fig.title.text = df.location
+            time_x_range.start = df["datetime"].min()
+            time_x_range.end = df["datetime"].max()           
+            time_y_range.start = df["value"].min()
+            time_y_range.end = df["value"].max()
+            tabs.active = 1 
 
-def update_plot_on_tap(event):
+def update_on_tap(event):
     '''update time_graph with location selected'''
     x, y = event.__dict__['x'],event.__dict__['y']
-    distance_threshold = (map_x_range.end - map_x_range.start) * 0.05
+    distance_threshold = (map_x_range.end - map_x_range.start) * 0.005
     gdf = gpd.GeoDataFrame.from_features(json.loads(map_src.geojson)['features'])
     gdf['distance'] = gdf['geometry'].distance(Point(x,y))
     gdf = gdf.loc[gdf['distance'] < distance_threshold]
     if not gdf.empty:
         gdf.index = gdf['locationId'] 
-        location_id = gdf.sort_values('distance').index[0]
+        location_ids = list(gdf.sort_values('distance').index)
         
-        _update_map_select_src(location_id,gdf)
+        _update_map_select_src(location_ids,gdf)
         
-        select_locations.value = [location_id]
+        select_locations.value = location_ids
 
-        _update_map_time_fig(location_id)  
+        _update_time_fig(location_id=select_locations.value,
+                         parameter_id=select_parameters.value)   
 
 width,height = _screen_resolution()
 
-def update_locations_on_filter_select(attrname, old, new):
+def update_on_filter_select(attrname, old, new):
     select_value = select_filter.value
     
-    gdf = fews_rest.get_locations(url,filterId=filter_children[select_value])
+    gdf = rest.get_locations(filterId=filter_children[select_value])
     map_src.geojson = gdf.to_json()
     
     locations = list(gdf['locationId'].values)
     select_locations.options = locations
     select_locations.value = []
     
-def update_map_select_on_locations_select(attrname, old, new):
-    location_id = select_locations.value[0]
+def update_on_locations_select(attrname, old, new):  
+    _update_map_select_src(select_locations.value)
     
-    _update_map_time_fig(location_id)
-    _update_map_select_src(location_id)
+    _update_time_fig(location_id=select_locations.value,
+                     parameter_id=select_parameters.value)  
     
+    
+def update_on_filter_select(attrname, old, new):
+    select_value = select_filter.value
+    
+    gdf = rest.get_locations(filterId=filter_children[select_value])
+    map_src.geojson = gdf.to_json()
+    
+    locations = list(gdf['locationId'].values)
+    select_locations.options = locations
+    select_locations.value = []
+       
+def update_on_parameters_select(attrname, old, new):
+    
+    _update_time_fig(location_id=select_locations.value,
+                     parameter_id=select_parameters.value)  
+
+#%% pi-rest object
+rest = fews_rest.pi_rest(url,start_time,end_time)
 
 #%% time fig widget
 time_df = pd.DataFrame({'datetime':[],'value':[]})
@@ -140,7 +169,7 @@ time_fig.xaxis.formatter=DatetimeTickFormatter(hours=["%H:%M:%S"],
 time_fig.line(x='datetime',y='value',color = 'blue',source = time_src)
 
 #%% map fig widget
-map_gdf = fews_rest.get_locations(url,filterId=filter_selected)
+map_gdf = rest.get_locations(filterId=filter_selected)
 map_src = GeoJSONDataSource(geojson=map_gdf.to_json())
 map_select_src = ColumnDataSource({'x':[],'y':[]})
 
@@ -174,29 +203,36 @@ map_fig.circle('x', 'y',
                line_color="red", 
                fill_color="red")
 
-map_fig.on_event(events.Tap, update_plot_on_tap)
+map_fig.on_event(events.Tap, update_on_tap)
 
 #%% filter selection widget
-filters = fews_rest.get_filters(url,filterId=filter_parent)
+filters = rest.get_filters(filterId=filter_parent)
 filter_children =  {item['name']:item['id'] for item in filters[filter_parent]['child']}
 filter_value = next(key for key,value in filter_children.items() if value == filter_selected)
 select_filter = Select(title="Filters:", value=filter_value, options=list(filter_children.keys()))
 
-select_filter.on_change('value', update_locations_on_filter_select)
+select_filter.on_change('value', update_on_filter_select)
 
 #%% location selection widget
 locations = list(map_gdf['locationId'].values)
 select_locations = MultiSelect(title="Locations:", value=[], options=locations)
 select_locations.height = int(height * 0.25)
 
-select_locations.on_change('value', update_map_select_on_locations_select)
+select_locations.on_change('value', update_on_locations_select)
+
+#%% parameter selection widget
+select_parameters = MultiSelect(title="Parameters:", value=[], options=[])
+select_parameters.height = int(height * 0.25)
+select_parameters.options = [par for par in rest.parameters if re.match(parameter_filter,par)]
+
+select_parameters.on_change('value', update_on_parameters_select)
 
 #%% layout
 tabs = Tabs(tabs=[Panel(child=map_fig, title="kaart"),
                   Panel(child=time_fig, title="grafiek")]
             )
 
-layout = row(column(select_filter,select_locations),
+layout = row(column(select_filter,select_locations,select_parameters),
              tabs)
 
 curdoc().add_root(layout)
