@@ -50,17 +50,18 @@ def get_timeseries(url,locationIds,parameterIds,startTime,endTime,documentFormat
     requests.get('https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/timeseries?documentFormat=PI_JSON&locationIds=PG_Oranjedorp_instroom&parameterIds=H.meting&startTime=2020-09-01T00:00:00Z&endTime=2020-11-01T00:00:00Z&documentVersion=1.23&thinning=5146875')
 
     if response.status_code == 200:
-        if 'timeSeries' in response.json():
+        if 'timeSeries' in response.json().keys():
             time_series = response.json()['timeSeries'][0]
-            df = pd.DataFrame(time_series['events'])
-            df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time'])
-            df['value'] = pd.to_numeric(df['value'])
-            df.parameter = time_series['header']['parameterId']
-            df.units = time_series['header']['units']
-            df.location = time_series['header']['locationId']
-            df.time_zone = response.json()['timeZone']
+            if 'events' in time_series.keys():
+                df = pd.DataFrame(time_series['events'])
+                df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time'])
+                df['value'] = pd.to_numeric(df['value'])
+                df.parameter = time_series['header']['parameterId']
+                df.units = time_series['header']['units']
+                df.location = time_series['header']['locationId']
+                df.time_zone = response.json()['timeZone']
             
-            return df
+                return df
         
         else:
             print(response.json())

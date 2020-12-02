@@ -26,6 +26,8 @@ import json
 url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
 thinner = None
 map_buffer = 1000
+start_time = pd.Timestamp(year=2000,month=1,day=1)
+
 
 def screen_resolution():
     '''computes server screen resolution'''
@@ -63,12 +65,11 @@ def update_plot_from_geo(event):
             
             tabs.active = 1   
 
-time_df = fews_rest.get_timeseries(url,
-                                   locationIds = 'PG_Oranjedorp_instroom',
-                                   parameterIds = 'H.meting',
-                                   startTime = '2020-09-01T00:00:00Z',
-                                   endTime = '2020-11-01T00:00:00Z',
-                                   thinning = thinner)
+time_df = pd.DataFrame({'datetime':[],'value':[]})
+time_df.location = ''
+time_df.time_zone = '0'
+time_df.parameter = ''
+time_df.units = ''
 
 time_src = ColumnDataSource(data=time_df)
 
@@ -76,6 +77,10 @@ gdf = fews_rest.get_locations(url,filterId='HW_WVS')
 geo_src = GeoJSONDataSource(geojson=gdf.to_json())
 
 width,height = screen_resolution()
+
+timespan = (pd.Timestamp.now() - start_time).days
+thinner = int(timespan * 86400 * 1000 / width)
+
 time_fig = figure(title = time_df.location,
                   tools=['pan','box_zoom','wheel_zoom','reset','save'],
                   active_drag=None,
@@ -115,15 +120,18 @@ map_fig.toolbar.autohide = True
 tile_provider = get_provider(Vendors.CARTODBPOSITRON)
 map_fig.add_tile(tile_provider,name='background')
 
-map_fig.circle('x', 'y', source=geo_src, color='red', name='locaties')
+map_fig.circle('x', 'y', 
+               size=5, 
+               source=geo_src, 
+               line_color="blue", 
+               fill_color="white", 
+               line_width=2)
 
 map_fig.on_event(events.Tap, update_plot_from_geo)
 
 tabs = Tabs(tabs=[Panel(child=map_fig, title="kaart"),
                   Panel(child=time_fig, title="grafiek")]
             )
-
-
 
 layout = column(tabs)
 
