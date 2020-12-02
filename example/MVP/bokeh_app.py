@@ -27,6 +27,7 @@ url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
 thinner = None
 map_buffer = 1000
 start_time = pd.Timestamp(year=2000,month=1,day=1)
+now = pd.Timestamp.now()
 
 
 def screen_resolution():
@@ -39,7 +40,7 @@ def screen_resolution():
 def update_plot_from_geo(event):
     '''update time_graph with location selected'''
     x, y = event.__dict__['x'],event.__dict__['y']
-    distance_threshold = (x_range.end - x_range.start) * 0.05
+    distance_threshold = (map_x_range.end - map_x_range.start) * 0.05
     gdf['distance'] = gdf['geometry'].distance(Point(x,y))
     gdf_dist = gdf.loc[gdf['distance'] < distance_threshold]
     if not gdf_dist.empty:
@@ -60,8 +61,11 @@ def update_plot_from_geo(event):
             time_src.data.update(src.data)
         
             time_fig.title.text = df.location
-            time_fig.y_range.start = df["value"].min()
-            time_fig.y_range.end = df["value"].max()
+            time_x_range.start = df["datetime"].min()
+            time_x_range.end = df["datetime"].max()           
+            
+            time_y_range.start = df["value"].min()
+            time_y_range.end = df["value"].max()
             
             tabs.active = 1   
 
@@ -78,8 +82,11 @@ geo_src = GeoJSONDataSource(geojson=gdf.to_json())
 
 width,height = screen_resolution()
 
-timespan = (pd.Timestamp.now() - start_time).days
+timespan = (now - start_time).days
 thinner = int(timespan * 86400 * 1000 / width)
+
+time_x_range = Range1d(start=start_time, end=now, bounds=None)
+time_y_range = Range1d(start=0, end=1, bounds=None)
 
 time_fig = figure(title = time_df.location,
                   tools=['pan','box_zoom','wheel_zoom','reset','save'],
@@ -88,8 +95,8 @@ time_fig = figure(title = time_df.location,
                   width = int(width * 0.75),
                   x_axis_label = 'datum [gmt {0:+}]'.format(int(float(time_df.time_zone))),
                   y_axis_label = f'{time_df.parameter} [{time_df.units}]',
-                  x_range=(time_df['datetime'].min(), time_df['datetime'].max()),
-                  y_range=(time_df['value'].min(),time_df['value'].max())
+                  x_range=time_x_range,
+                  y_range=time_y_range
                   )
 
 time_fig.toolbar.autohide = True
@@ -104,15 +111,15 @@ time_fig.xaxis.formatter=DatetimeTickFormatter(hours=["%H:%M:%S"],
 time_fig.line(x='datetime',y='value',color = 'blue',source = time_src)
 
 xmin,ymin,xmax,ymax = gdf['geometry'].buffer(map_buffer).total_bounds
-x_range = Range1d(start=xmin, end=xmax, bounds=None)
-y_range = Range1d(start=ymin, end=ymax, bounds=None)
+map_x_range = Range1d(start=xmin, end=xmax, bounds=None)
+map_y_range = Range1d(start=ymin, end=ymax, bounds=None)
 
 map_fig = figure(tools='wheel_zoom,pan', 
           active_scroll="wheel_zoom",
           height = int(height *0.75),
           width = int(width * 0.75),
-          x_range=x_range,
-          y_range=y_range
+          x_range = map_x_range,
+          y_range = map_y_range
           )
 map_fig.axis.visible = False
 map_fig.toolbar.autohide = True
