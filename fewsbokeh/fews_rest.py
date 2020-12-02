@@ -10,6 +10,21 @@ import requests
 _geodatum = {'WGS 1984':'epsg:4326',
              'Rijks Driehoekstelsel':'epsg:28992'}
 
+def get_filters(url,documentFormat='PI_JSON',filterId=None):
+    rest_url = f'{url}filters'
+    
+    parameters = dict(documentFormat=documentFormat,
+                      filterId=filterId)    
+    
+    response = requests.get(rest_url,parameters)
+    
+    if response.status_code == 200:
+        if 'filters' in response.json().keys():
+            filters = {item['id']:{key:value for key,value in item.items() if not key == 'id'} 
+                       for item in response.json()['filters']}
+            return filters
+        else:
+            return None
    
 def get_locations(url,documentFormat='PI_JSON',showAttributes=False,filterId=None,documentVersion='1.26'):
     rest_url = f'{url}locations'
