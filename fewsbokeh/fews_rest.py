@@ -122,11 +122,20 @@ class pi_rest():
                     df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time'])
                     df['value'] = pd.to_numeric(df['value'])
                     df = df.drop(columns=[col for col in df.columns if not col in ['datetime','value']])
+                else:
+                    print('empty timeseries')
+                    df = pd.DataFrame({'datetime':[],'value':[]})
+                    
+                if 'header' in time_series.keys():
+                    df.nodata = time_series['header']['missVal']
+                    df = df.loc[df['value'] != int(float(df.nodata))]
                     df.location_id = time_series['header']['locationId']
+                    df.parameter_id = time_series['header']['parameterId']
+                    df.units = time_series['header']['units']
                     df.time_zone = response.json()['timeZone']
                     df.url = response.url
                 
-                    result = df
+                result = df
             
             else:
                 print(response.json())
@@ -135,7 +144,9 @@ class pi_rest():
         else:
             print(f'server responded with error ({response.status_code}): {response.text}')
             print(f'url send to the server was: {response.url}')
-            
+        
+        if result is None:
+            print(response.url)
         return result
         
     

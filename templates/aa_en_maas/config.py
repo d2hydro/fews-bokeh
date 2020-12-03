@@ -15,3 +15,4 @@ end_time = pd.Timestamp.now()
 filter_parent = 'Export_Hydronet'
 filter_selected = 'Hydronet_Keten'
 parameter_filter = '.*'
+debug = True

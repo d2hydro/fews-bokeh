@@ -15,7 +15,7 @@ import geopandas as gpd
 from bokeh import events
 from bokeh.io import curdoc
 from bokeh.models.widgets import Select,Div,Panel,Tabs,MultiSelect
-from bokeh.models import ColumnDataSource,GeoJSONDataSource,DatetimeTickFormatter,Tool,Range1d
+from bokeh.models import ColumnDataSource,GeoJSONDataSource,DatetimeTickFormatter,Tool,Range1d,HoverTool
 from bokeh.core.properties import String
 from bokeh.layouts import row,column
 from bokeh.plotting import figure
@@ -35,6 +35,7 @@ def _screen_resolution():
     return width,height
 
 def _update_map_select_src(location_id,gdf=None):
+    if debug: print('bokeh: _update_map_select_src')
     if gdf is None:
         gdf = gpd.GeoDataFrame.from_features(json.loads(map_src.geojson)['features'])
         gdf.index = gdf['locationId']
@@ -44,10 +45,10 @@ def _update_map_select_src(location_id,gdf=None):
     map_select_src.data.update({'x':x,'y':y})
     #map_select_src.data.update({'x':[x],'y':[y]})
     
-    return x,y
-        
+    return x,y       
 
 def _update_time_fig(location_id,parameter_id):
+    if debug: print('bokeh: _update_time_fig')
     if (len(location_id) > 0) and (len(parameter_id) > 0):
         
         df = rest.get_timeseries(filterId = filter_children[select_filter.value],
@@ -64,20 +65,36 @@ def _update_time_fig(location_id,parameter_id):
                 src = ColumnDataSource(data=df)
                 time_src.data.update(src.data)
                 time_fig.title.text = df.location_id
-                print(f'x-range:{df["datetime"].min()} - {df["datetime"].max()}')
-                print(f'y-range:{df["value"].min()} - {df["value"].max()}')
-                time_x_range.start = df["datetime"].min()
-                time_x_range.end = df["datetime"].max()           
-                time_y_range.start = df["value"].min()
-                time_y_range.end = df["value"].max()
+                time_fig.yaxis.axis_label = f'{df.parameter_id} [{df.units}]'
+                time_fig.xaxis.axis_label = 'datum [gmt {0:+}]'.format(int(float(df.time_zone)))
+               
+                
+                try:
+                    time_x_range.start = df["datetime"].min()
+                    time_x_range.end = df["datetime"].max()
+                except:
+                    print(f'x-range:{df["datetime"].min()} - {df["datetime"].max()}')
+                    time_x_range.start = rest.start_time
+                    time_x_range.end = rest.end_time
+                try:
+                    time_y_range.start = df["value"].min()
+                    time_y_range.end = df["value"].max()
+                except:
+                    print(f'y-range:{df["value"].min()} - {df["value"].max()}')
+                    time_y_range.start = 0
+                    time_y_range.end = 1
+                    
                 tabs.active = 1 
     
                 delta = pd.Timestamp.now() - start
                 print(f'plot graph in {delta.seconds + delta.microseconds/1000000} seconds, {len(df["value"])} timesteps')
             except:
                 print(f'bokeh failed to plot response from server-url: {df.url}')
+    else:
+        time_src.data.update({'datetime':[],'value':[]})
 
 def update_on_tap(event):
+    if debug: print('bokeh: _update_on_tap')
     '''update time_graph with location selected'''
     x, y = event.__dict__['x'],event.__dict__['y']
     distance_threshold = (map_x_range.end - map_x_range.start) * 0.005
@@ -98,6 +115,7 @@ def update_on_tap(event):
 width,height = _screen_resolution()
 
 def update_on_filter_select(attrname, old, new):
+    if debug: print('bokeh: _update_on_filter_select')
     select_value = select_filter.value
     
     gdf = rest.get_locations(filterId=filter_children[select_value])
@@ -110,20 +128,26 @@ def update_on_filter_select(attrname, old, new):
     select_parameters.options = parameters
     select_parameters.value = [val for val in select_parameters.value if val in parameters]
     
-def update_on_locations_select(attrname, old, new):  
+    if (not select_locations.value) or (not select_parameters.value):
+        tabs.active = 0
+        time_src.data.update({'datetime':[],'value':[]})
+    
+def update_on_locations_select(attrname, old, new):
+    if debug: print('bokeh: _update_on_locations_select')
     _update_map_select_src(select_locations.value)
-    
-    _update_time_fig(location_id=select_locations.value,
-                     parameter_id=select_parameters.value)
-    
-    if len(select_locations.value) > 0:
+       
+    if select_locations.value:
         parameters = rest.get_parameters(filter_selected=filter_children[select_filter.value],
                                          locations = select_locations.value)
         select_parameters.options = parameters
         select_parameters.value = [val for val in select_parameters.value if val in parameters]
         
+        _update_time_fig(location_id=select_locations.value,
+                     parameter_id=select_parameters.value)
+        
        
 def update_on_parameters_select(attrname, old, new):
+    if debug: print('bokeh: _update_on_parameters_select')
     
     _update_time_fig(location_id=select_locations.value,
                      parameter_id=select_parameters.value)  
@@ -132,13 +156,7 @@ def update_on_parameters_select(attrname, old, new):
 rest = fews_rest.pi_rest(url,start_time,end_time)
 
 #%% time fig widget
-time_df = pd.DataFrame({'datetime':[],'value':[]})
-time_df.location = ''
-time_df.time_zone = '0'
-time_df.parameter = ''
-time_df.units = ''
-
-time_src = ColumnDataSource(data=time_df)
+time_src = ColumnDataSource(data={'datetime':[],'value':[]})
 
 timespan = (end_time - start_time).days
 thinner = int(timespan * 86400 * 1000 / width)
@@ -147,13 +165,16 @@ print(f'thinner {thinner}')
 time_x_range = Range1d(start=start_time, end=end_time, bounds=None)
 time_y_range = Range1d(start=0, end=1, bounds=None)
 
-time_fig = figure(title = time_df.location,
-                  tools=['pan','box_zoom','wheel_zoom','reset','save'],
+time_hover =    HoverTool(tooltips=[('datetime', '@datetime{%F}'),
+                                    ('value', '@value')],
+                          formatters={'@datetime': 'datetime'})
+
+time_fig = figure(title = '',
+                  tools=['pan','box_zoom','wheel_zoom','reset',time_hover,'save'],
                   active_drag=None,
                   height = int(height *0.75),
                   width = int(width * 0.75),
-                  x_axis_label = 'datum [gmt {0:+}]'.format(int(float(time_df.time_zone))),
-                  y_axis_label = f'{time_df.parameter} [{time_df.units}]',
+                  y_axis_label = ' []',
                   x_range=time_x_range,
                   y_range=time_y_range
                   )
@@ -178,7 +199,11 @@ xmin,ymin,xmax,ymax = map_gdf['geometry'].buffer(map_buffer).total_bounds
 map_x_range = Range1d(start=xmin, end=xmax, bounds=None)
 map_y_range = Range1d(start=ymin, end=ymax, bounds=None)
 
-map_fig = figure(tools='wheel_zoom,pan', 
+map_hover = HoverTool(tooltips = [ ('locationId', '@locationId'),
+                                  ('shortName', '@shortName')])
+
+
+map_fig = figure(tools=['wheel_zoom','pan',map_hover], 
           active_scroll="wheel_zoom",
           height = int(height *0.75),
           width = int(width * 0.75),
