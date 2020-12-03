@@ -5,6 +5,7 @@ Created on Tue Dec  1 13:13:25 2020
 @author: danie
 """
 
+from config import *
 from fewsbokeh import fews_rest
 from pathlib import Path
 import json
@@ -24,15 +25,15 @@ import ctypes
 import json
 import re
 
-url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
-thinner = None
-map_buffer = 1000
-start_time = pd.Timestamp(year=2020,month=1,day=1)
-end_time = pd.Timestamp.now()
-filter_parent = 'Fluvial'
-filter_selected = 'HW_WVS'
-parameter_filter = '^((?!WNS).)*$'
-parameter_filter = '.*meetwaarde'
+# url =  'https://fewsvechtdb.lizard.net/FewsWebServices/rest/fewspiservice/v1/'
+# thinner = None
+# map_buffer = 1000
+# start_time = pd.Timestamp(year=2020,month=1,day=1)
+# end_time = pd.Timestamp.now()
+# filter_parent = 'Fluvial'
+# filter_selected = 'HW_WVS'
+# parameter_filter = '^((?!WNS).)*$'
+# parameter_filter = '.*meetwaarde'
 
 #%%
 

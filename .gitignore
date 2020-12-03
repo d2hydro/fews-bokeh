@@ -1,3 +1,7 @@
 
 fewsbokeh.egg-info/*
 fewsbokeh/__pycache__/*
+templates/aa_en_maas/apache/*
+templates/aa_en_maas/__pycache__/*
+*.pyc
+testje.py

@@ -7,9 +7,17 @@ import geopandas as gpd
 from shapely.geometry import Point
 import requests
 
-_geodatum = {'WGS 1984':'epsg:4326',
+_GEODATUM = {'WGS 1984':'epsg:4326',
              'Rijks Driehoekstelsel':'epsg:28992'}
 
+_PARAMETERS_ALLOWED = {'get_timeseries':['locationIds',
+                                         'startTime',
+                                         'endTime',
+                                         'filterId',
+                                         'parameterIds',
+                                         'documentVersion',
+                                         'thinning',
+                                         'onlyHeaders']}
 
 def _get_parameters(url,documentFormat='PI_JSON'):
     rest_url = f'{url}parameters'
@@ -25,7 +33,7 @@ def _get_parameters(url,documentFormat='PI_JSON'):
 class pi_rest():
     
     def __init__(self, url, start_time, end_time):
-        self.documentFormat='PI_JSON'
+        self.document_format='PI_JSON'
         self.url = url
         self.parameters = _get_parameters(url)
         self.start_time = start_time
@@ -34,7 +42,7 @@ class pi_rest():
     def get_filters(self,filterId=None):
         rest_url = f'{self.url}filters'
         
-        parameters = dict(documentFormat=self.documentFormat,
+        parameters = dict(documentFormat=self.document_format,
                           filterId=filterId)    
         
         response = requests.get(rest_url,parameters)
@@ -46,11 +54,28 @@ class pi_rest():
                 return filters
             else:
                 return None
-       
+     
+    def get_parameters(self,filter_selected,locations=None):
+        result = None
+        
+        timeseries = self.get_timeseries(filterId = filter_selected,
+                                         locationIds = locations,
+                                         parameterIds = self.parameters,
+                                         onlyHeaders = True)
+        
+        if 'timeSeries' in timeseries.keys():
+            result = list(set([series['header']['parameterId'] 
+                             for series in timeseries['timeSeries']]))
+
+        else:
+            print(f'no timeSeries in filter {filter_selected} for locations {locations}')
+        
+        return result
+        
     def get_locations(self,showAttributes=False,filterId=None,documentVersion='1.26'):
         rest_url = f'{self.url}locations'
         
-        parameters = dict(documentFormat=self.documentFormat,
+        parameters = dict(documentFormat=self.document_format,
                           showAttributes=showAttributes,
                           filterId=filterId,
                           documentVersion=documentVersion)
@@ -59,7 +84,7 @@ class pi_rest():
         if response.status_code == 200:
             gdf = gpd.GeoDataFrame(response.json()['locations'])
             gdf['geometry'] = gdf.apply((lambda x:Point(float(x['x']),float(x['y']))),axis=1)
-            gdf.crs = _geodatum[response.json()['geoDatum']]
+            gdf.crs = _GEODATUM[response.json()['geoDatum']]
             gdf = gdf.to_crs('epsg:3857')
             gdf['x'] = gdf['geometry'].x
             gdf['y'] = gdf['geometry'].y
@@ -68,48 +93,49 @@ class pi_rest():
             
         return gdf
         
-    def get_timeseries(self,locationIds,startTime,endTime,parameterIds=None,documentVersion=None,thinning=None,onlyHeaders=False):
+    def get_timeseries(self,filterId,locationIds=None,startTime=None,endTime=None,parameterIds=None,documentVersion=None,thinning=None,onlyHeaders=False,unreliables=False):
         start = pd.Timestamp.now()
+        result = None
         rest_url = f'{self.url}timeseries'
+               
+        parameters = {key:value for key,value in locals().items() 
+                      if value and (key in _PARAMETERS_ALLOWED['get_timeseries'])}
         
-        parameters = dict(locationIds=locationIds,
-                          parameterIds=parameterIds,
-                          startTime=startTime,
-                          endTime=endTime,
-                          documentFormat=self.documentFormat,
-                          documentVersion=documentVersion,
-                          onlyHeaders=onlyHeaders,
-                          thinning=thinning)
-        
-        
+        parameters.update({'documentFormat':self.document_format})
+                
         response = requests.get(rest_url,parameters)
-        
         delta = pd.Timestamp.now() - start
-        print(f'get timeseries in {delta.seconds + delta.microseconds/1000000} seconds (status: {response.status_code})')
+        
         
         if response.status_code == 200:
             if onlyHeaders:
+                print(f'get timeseries headers in {delta.seconds + delta.microseconds/1000000} seconds')
                 return response.json()
             
             elif 'timeSeries' in response.json().keys():
+                print(f'get timeseries in {delta.seconds + delta.microseconds/1000000} seconds')
                 time_series = response.json()['timeSeries'][0]
                 if 'events' in time_series.keys():
                     df = pd.DataFrame(time_series['events'])
+                    if not unreliables:
+                        df = df.loc[pd.to_numeric(df['flag']) < 6]
                     df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time'])
                     df['value'] = pd.to_numeric(df['value'])
-                    df.parameter = time_series['header']['parameterId']
-                    df.units = time_series['header']['units']
-                    df.location = time_series['header']['locationId']
+                    df = df.drop(columns=[col for col in df.columns if not col in ['datetime','value']])
+                    df.location_id = time_series['header']['locationId']
                     df.time_zone = response.json()['timeZone']
+                    df.url = response.url
                 
-                    return df
+                    result = df
             
             else:
                 print(response.json())
-                
-                return None
+                result = response.json()
         
         else:
-            print(response.text)
+            print(f'server responded with error ({response.status_code}): {response.text}')
+            print(f'url send to the server was: {response.url}')
+            
+        return result
         
     
