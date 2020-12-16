@@ -10,35 +10,36 @@ import requests
 _GEODATUM = {'WGS 1984':'epsg:4326',
              'Rijks Driehoekstelsel':'epsg:28992'}
 
-_PARAMETERS_ALLOWED = {'get_timeseries':['locationIds',
-                                         'startTime',
-                                         'endTime',
-                                         'filterId',
-                                         'parameterIds',
-                                         'documentVersion',
-                                         'thinning',
-                                         'onlyHeaders']}
+_REQUEST_PARAMETERS_ALLOWED = {'timeseries':['locationIds',
+                                             'startTime',
+                                             'endTime',
+                                             'filterId',
+                                             'parameterIds',
+                                             'documentVersion',
+                                             'thinning',
+                                             'onlyHeaders']}
 
 def _get_parameters(url,documentFormat='PI_JSON'):
     rest_url = f'{url}parameters'
-    parameters = dict(documentFormat=documentFormat)    
+    parameters = dict(documentFormat=documentFormat)  
     response = requests.get(rest_url,parameters)
     
     if response.status_code == 200:
         if 'timeSeriesParameters' in response.json().keys():
-            return [item['id'] for item in response.json()['timeSeriesParameters']]
+            par_df = pd.DataFrame(response.json()['timeSeriesParameters']).set_index('id')
+            return par_df
         else:
             return None
 
-class pi_rest():
+class api():
     
-    def __init__(self, url, start_time, end_time):
+    def __init__(self, url, logger):
         self.document_format='PI_JSON'
         self.url = url
         self.parameters = _get_parameters(url)
-        self.start_time = start_time
-        self.end_time = end_time
-
+        self.locations = None
+        self.logger = logger
+        
     def get_filters(self,filterId=None):
         rest_url = f'{self.url}filters'
         
@@ -60,7 +61,7 @@ class pi_rest():
         
         timeseries = self.get_timeseries(filterId = filter_selected,
                                          locationIds = locations,
-                                         parameterIds = self.parameters,
+                                         parameterIds = self.parameters.index.to_list(),
                                          onlyHeaders = True)
         
         if 'timeSeries' in timeseries.keys():
@@ -71,8 +72,17 @@ class pi_rest():
             print(f'no timeSeries in filter {filter_selected} for locations {locations}')
         
         return result
+    
+    def to_parameter_names(self, parameter_ids):
+        ''' returns the parameter names from a list of parameter_ids '''
+        return self.parameters.loc[parameter_ids]['name'].to_list()
+    
+    def to_parameter_ids(self, parameter_names):
+        ''' returns the parameter ids from a list of parameter_ids '''
+        return self.parameters.loc[self.parameters['name'].isin(parameter_names)].index.to_list()
         
     def get_locations(self,showAttributes=False,filterId=None,documentVersion='1.26'):
+        ''' request locations and return as GeoDataFrame '''
         rest_url = f'{self.url}locations'
         
         parameters = dict(documentFormat=self.document_format,
@@ -88,8 +98,17 @@ class pi_rest():
             gdf = gdf.to_crs('epsg:3857')
             gdf['x'] = gdf['geometry'].x
             gdf['y'] = gdf['geometry'].y
-            drop_cols = [col for col in gdf.columns if not col in ['locationId', 'description', 'shortName', 'geometry']]
+            drop_cols = [col for col in gdf.columns if not col in ['locationId', 
+                                                                   'description', 
+                                                                   'shortName', 
+                                                                   'parentLocationId',
+                                                                   'x',
+                                                                   'y',
+                                                                   'geometry']]
             gdf = gdf.drop(drop_cols,axis=1)
+            gdf.index = gdf['locationId']
+            
+            self.locations = gdf
             
         return gdf
         
@@ -97,49 +116,46 @@ class pi_rest():
         start = pd.Timestamp.now()
         result = None
         rest_url = f'{self.url}timeseries'
-               
+          
+        
         parameters = {key:value for key,value in locals().items() 
-                      if value and (key in _PARAMETERS_ALLOWED['get_timeseries'])}
+                      if value and (key in _REQUEST_PARAMETERS_ALLOWED['timeseries'])}
         
         parameters.update({'documentFormat':self.document_format})
                 
         response = requests.get(rest_url,parameters)
-        delta = pd.Timestamp.now() - start
-        
         
         if response.status_code == 200:
             if onlyHeaders:
-                print(f'get timeseries headers in {delta.seconds + delta.microseconds/1000000} seconds')
+                delta = pd.Timestamp.now() - start 
+                self.logger.info(f'get timeseries headers in {delta.seconds + delta.microseconds/1000000} seconds')
                 return response.json()
             
             elif 'timeSeries' in response.json().keys():
-                print(f'get timeseries in {delta.seconds + delta.microseconds/1000000} seconds')
-                time_series = response.json()['timeSeries'][0]
-                if 'events' in time_series.keys():
-                    df = pd.DataFrame(time_series['events'])
-                    if not unreliables:
-                        df = df.loc[pd.to_numeric(df['flag']) < 6]
-                    df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time'])
-                    df['value'] = pd.to_numeric(df['value'])
-                    df = df.drop(columns=[col for col in df.columns if not col in ['datetime','value']])
-                else:
-                    print('empty timeseries')
-                    df = pd.DataFrame({'datetime':[],'value':[]})
-                    
-                if 'header' in time_series.keys():
-                    df.nodata = time_series['header']['missVal']
-                    df = df.loc[df['value'] != int(float(df.nodata))]
-                    df.location_id = time_series['header']['locationId']
-                    df.parameter_id = time_series['header']['parameterId']
-                    df.units = time_series['header']['units']
-                    df.time_zone = response.json()['timeZone']
-                    df.url = response.url
+                result = []
+                for time_series in response.json()['timeSeries']:
+                    ts = {}
+                    if 'header' in time_series.keys():
+                        ts['header'] = time_series['header']
+                    if 'events' in time_series.keys():
+                        df = pd.DataFrame(time_series['events'])
+                        if not unreliables:
+                            df = df.loc[pd.to_numeric(df['flag']) < 6]
+                        df['datetime'] = pd.to_datetime(df['date']) + pd.to_timedelta(df['time']) 
+                        df['value'] = pd.to_numeric(df['value'])
+                        df = df.loc[df['value'] != pd.to_numeric(ts['header']['missVal'])]
+                        df = df.drop(columns=[col for col in df.columns if not col in ['datetime','value']])
+                        ts['events'] = df   
+                    result += [ts]                         
                 
-                result = df
+                delta = pd.Timestamp.now() - start        
+                print(f'get timeseries in {delta.seconds + delta.microseconds/1000000} seconds')  
+                
+                return response.json()['timeZone'], result
             
             else:
                 print(response.json())
-                result = response.json()
+                return response.json()
         
         else:
             print(f'server responded with error ({response.status_code}): {response.text}')
@@ -147,6 +163,7 @@ class pi_rest():
         
         if result is None:
             print(response.url)
+            
         return result
         
     

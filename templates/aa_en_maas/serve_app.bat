@@ -1,1 +1,0 @@
-bokeh serve bokeh_app.py --port 5002

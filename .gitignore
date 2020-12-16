@@ -5,3 +5,7 @@ templates/aa_en_maas/apache/*
 templates/aa_en_maas/__pycache__/*
 *.pyc
 testje.py
+projects/aa_en_maas/apache/*
+projects/aa_en_maas/serve_wik.bat
+projects/aa_en_maas/add_parameters.py
+trash/*
