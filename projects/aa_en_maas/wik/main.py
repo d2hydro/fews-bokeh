@@ -211,8 +211,6 @@ def update_on_tap(event):
     if not gdf.empty:
         gdf.index = gdf['locationId'] 
         locations = _to_location_ids(select_locations.value) + gdf.sort_values('distance').index.to_list()
-        
-        print(locations)
         _update_map_select_src(locations)
         
         select_locations.value = _to_location_names(locations)
@@ -332,9 +330,10 @@ map_fig = map_figure.generate(width=int(width * 0.75),
                               height=int(height *0.75),
                               x_range=map_x_range,
                               y_range=map_y_range,
-                              glymphs=map_glymphs)
+                              glymphs=map_glymphs
+                              )
 
-#map_fig.image_url(url='url', x='x', y='y', w='w',h='h', source=loc_src)
+#map_fig.circle(source=loc_src_pluvial)
 #show(map_fig)
 
 map_fig.on_event(events.Tap, update_on_tap)

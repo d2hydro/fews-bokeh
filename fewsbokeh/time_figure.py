@@ -26,7 +26,7 @@ def generate(width,
                                       ('value', '@value')],
                             formatters={'@datetime': 'datetime'})
     
-    tools=['box_zoom','xwheel_zoom','reset',time_hover,'save']
+    tools=['pan','box_zoom','xwheel_zoom','reset',time_hover,'save']
     
     time_fig = figure(title=title,
                       tools=tools,
