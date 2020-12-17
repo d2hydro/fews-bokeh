@@ -1,4 +1,4 @@
-name: bokehfews
+name: fewsbokeh
 
 channels:
   - conda-forge
@@ -8,3 +8,4 @@ dependencies:
   - bokeh
   - pandas
   - geopandas
+  - requests
