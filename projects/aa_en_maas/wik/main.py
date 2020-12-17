@@ -10,7 +10,6 @@ from config import (
     END_TIME,
     FILTER_PARENT,
     FILTER_SELECTED,
-    DEBUG,
 )
 
 from fewsbokeh.sources import fews_rest
@@ -51,8 +50,7 @@ def _update_map_select_src(location_id):
 
 
 def _update_time_fig(location_id, parameter_id):
-    if DEBUG:
-        logger.info("bokeh: _update_time_fig")
+    logger.debug("bokeh: _update_time_fig")
     colors = cycle(palette)
     if (len(location_id) > 0) and (len(parameter_id) > 0):
 
@@ -243,8 +241,7 @@ def get_loc_df(filter_id):
 
 def update_on_double_tap(event):
     """Update time_graph with location selected."""
-    if DEBUG:
-        logger.info("bokeh: update_on_tap")
+    logger.debug("bokeh: update_on_tap")
 
     _update_map_select_src([])
     select_locations.value = []
@@ -252,8 +249,7 @@ def update_on_double_tap(event):
 
 def update_on_tap(event):
     """Update when tap in map with location selected."""
-    if DEBUG:
-        logger.info("bokeh: update_on_tap")
+    logger.debug("bokeh: update_on_tap")
     x, y = event.__dict__["x"], event.__dict__["y"]
     distance_threshold = (map_x_range.end - map_x_range.start) * 0.005
     gdf = rest.locations.copy()
@@ -277,8 +273,7 @@ def update_on_tap(event):
 
 def update_on_filter_select(attrname, old, new):
     """Update when user selects different filter."""
-    if DEBUG:
-        logger.info("bokeh: update_on_filter_select")
+    logger.debug("bokeh: update_on_filter_select")
     select_value = select_filter.value
 
     _, loc_df = get_loc_df(filter_children[select_value])
@@ -306,8 +301,7 @@ def update_on_filter_select(attrname, old, new):
 
 def update_on_locations_select(attrname, old, new):
     """Update when user selects in locations filter."""
-    if DEBUG:
-        logger.info("bokeh: update_on_locations_select")
+    logger.debug("bokeh: update_on_locations_select")
     _update_map_select_src(_to_location_ids(select_locations.value))
 
     if select_locations.value:
@@ -328,8 +322,7 @@ def update_on_locations_select(attrname, old, new):
 
 def update_on_parameters_select(attrname, old, new):
     """Update when user selects in parameter filter."""
-    if DEBUG:
-        logger.info("bokeh: update_on_parameters_select")
+    logger.debug("bokeh: update_on_parameters_select")
 
     _update_time_fig(
         location_id=_to_location_ids(select_locations.value),
