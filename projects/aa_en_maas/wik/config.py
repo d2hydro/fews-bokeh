@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec  3 17:07:46 2020
+"""Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
 
-@author: danie
-"""
 import pandas as pd
 
-title = 'Bokeh FEWS-REST client op WIK Aa en Maas'
-url =  'http://localhost:7080/FewsWebServices/rest/fewspiservice/v1/'
-thinner = None
-map_buffer = 1000
-start_time = pd.Timestamp(year=2019,month=1,day=1)
-end_time = pd.Timestamp.now()
-filter_parent = 'Export_Hydronet'
-filter_selected = 'Hydronet_Keten'
-parameter_filter = '.*'
-debug = True
+TITLE = "Bokeh FEWS-REST client op WIK Aa en Maas"
+SERVER = "localhost:5002"
+URL = "http://localhost:7080/FewsWebServices/rest/fewspiservice/v1/"
+MAP_BUFFER = 1000
+START_TIME = pd.Timestamp(year=2019, month=1, day=1)
+END_TIME = pd.Timestamp.now()
+FILTER_PARENT = "Export_Hydronet"
+FILTER_SELECTED = "Hydronet_Keten"
+LOG_LEVEL = "DEBUG"
+DEBUG = True
