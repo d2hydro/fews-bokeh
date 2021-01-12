@@ -26,7 +26,7 @@ _REQUEST_PARAMETERS_ALLOWED = {
 }
 
 
-class api:
+class Api:
     """
     FEWS PI-REST api it needs an server url and a logger.
 
@@ -107,7 +107,7 @@ class api:
         """Convert parameterIds to names."""
         return self.parameters.loc[parameterIds]["name"].to_list()
 
-    def to_parameterIds(self, names):
+    def to_parameter_ids(self, names):
         """Convert parameterIds to parameterIds."""
         return self.parameters.loc[self.parameters["name"].isin(names)].index.to_list()
 
