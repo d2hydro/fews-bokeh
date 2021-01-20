@@ -5,11 +5,13 @@ from config import (
     START_TIME,
     END_TIME,
     FILTER_PARENT,
+    EXCLUDE_PARS
 )
 
 from itertools import cycle
 import pandas as pd
 import geopandas as gpd
+import time
 from bokeh.models import ColumnDataSource
 from fewsbokeh.sources import fews_rest
 from shapely.geometry import Point
@@ -28,6 +30,30 @@ def _screen_resolution():
     return width, height
 
 
+class Timer(object):
+    """Record function efficiency."""
+
+    def __init__(self, logger):
+        self.start = time.time()
+        self.milestone = self.start
+        self.logger = logger
+
+    def start(self):
+        """Start the timer."""
+        self.start = time.time()
+
+    def report(self, message=""):
+        """Set milestone and report."""
+        self.milestone = time.time()
+        self.logger.debug(f"{message} in {(self.milestone - self.start):.3f} sec")
+
+    def reset(self, message=None):
+        """Report task-efficiency and reset."""
+        if message:
+            self.logger.debug(f"{message} in {(time.time() - self.start):.3f} sec")
+        self.start = time.time()
+
+
 width, height = _screen_resolution()
 
 
@@ -36,19 +62,25 @@ class Data(object):
 
     def __init__(self, filterId, logger):
         self.logger = logger
-        self.fews_api = fews_rest.Api(URL, logger)
+        self.timer = Timer(logger)
+        self.fews_api = fews_rest.Api(URL, logger, filterId)
+        self.timer.report("FEWS-API initiated")
         self.filters = self.Filters(filterId,
                                     self.fews_api,
                                     logger)
-
+        self.timer.report("filters initiated")
         self.locations = self.Locations(filterId,
                                         self.fews_api,
                                         logger)
+        self.timer.report("locations initiated")
         self.parameters = self.Parameters(filterId,
                                           self.fews_api,
-                                          logger)
-
+                                          logger,
+                                          locationIds=[],
+                                          exclude=EXCLUDE_PARS)
+        self.timer.report("parameters initiated")
         self.timeseries = self.TimeSeries(self.fews_api, logger)
+        self.timer.reset("init finished")
 
     def update_filter_select(self, filter_name):
         """Update datamodel on selected filter."""
@@ -110,7 +142,9 @@ class Data(object):
         """Available filters."""
 
         def __init__(self, filterId, fews_api, logger):
-            self.filters = fews_api.get_filters(filterId=FILTER_PARENT)[FILTER_PARENT]["child"]
+            self.filters = fews_api.get_filters(
+                filterId=FILTER_PARENT)[FILTER_PARENT]["child"]
+
             self.ids = [item["id"] for item in self.filters]
             self.names = [item["name"] for item in self.filters]
             self.selected = dict()
@@ -212,21 +246,30 @@ class Data(object):
     class Parameters(object):
         """Available parameters."""
 
-        def __init__(self, filterId, fews_api, logger):
+        def __init__(self, filterId, fews_api, logger, locationIds, exclude):
             self.fews_api = fews_api
             self.logger = logger
             self.groups = None
             self.ids = None
             self.names = None
 
-            self.update(filterId)
+            self.update(filterId, locationIds=locationIds, exclude=exclude)
 
-        def update(self, filterId, locationIds=[]):
+        def update(self, filterId, locationIds=[], exclude=[]):
             """Update locations by filterId."""
-            self.ids = self.fews_api.get_parameters(filterId=filterId,
-                                                    locationIds=locationIds)
+            if locationIds:
+                self.ids = self.fews_api.get_parameters(filterId=filterId,
+                                                        locationIds=locationIds)
+
+            else:
+                self.ids = self.fews_api._get_parameters(
+                    filterId=filterId).index.to_list()
+
+            if exclude:
+                self.ids = [par for par in self.ids if par not in exclude]
             self.names = self.fews_api.to_parameter_names(self.ids)
-            self.groups = self.fews_api.parameters.loc[self.ids]["parameterGroup"].to_list()
+            self.groups = self.fews_api.parameters.loc[
+                self.ids]["parameterGroup"].to_list()
 
     class TimeSeries(object):
         """TimeSeries data."""

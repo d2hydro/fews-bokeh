@@ -11,3 +11,4 @@ projects/aa_en_maas/add_parameters.py
 trash/*
 projects/aa_en_maas/wik/daterange.py
 scripts/*
+projects/aa_en_maas/wik/locations.txt

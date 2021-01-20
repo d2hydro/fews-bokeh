@@ -34,22 +34,26 @@ class Api:
     snake_case.
     """
 
-    def __init__(self, url, logger):
+    def __init__(self, url, logger, filterId):
         self.document_format = "PI_JSON"
         self.url = url
-        self.parameters = self._get_parameters()
+        self.parameters = None
         self.locations = None
         self.logger = logger
 
-    def _get_parameters(self):
+        self._get_parameters(filterId)
+
+    def _get_parameters(self, filterId):
         rest_url = f"{self.url}parameters"
-        parameters = dict(documentFormat=self.document_format)
+        parameters = dict(filterId=filterId,
+                          documentFormat=self.document_format)
         response = requests.get(rest_url, parameters)
 
         if response.status_code == 200:
             if "timeSeriesParameters" in response.json().keys():
                 par_df = pd.DataFrame(response.json()["timeSeriesParameters"])
                 par_df.set_index("id", inplace=True)
+                self.parameters = par_df
                 return par_df
             else:
                 return None
@@ -176,7 +180,6 @@ class Api:
         }
 
         parameters.update({"documentFormat": self.document_format})
-
         response = requests.get(rest_url, parameters)
 
         if response.status_code == 200:

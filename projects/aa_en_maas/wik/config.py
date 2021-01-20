@@ -11,3 +11,4 @@ END_TIME = pd.Timestamp.now()
 FILTER_PARENT = "Export_Hydronet"
 FILTER_SELECTED = "Hydronet_Keten"
 LOG_LEVEL = "DEBUG"
+EXCLUDE_PARS = ["Dummy"]
