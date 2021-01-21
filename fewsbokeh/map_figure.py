@@ -14,7 +14,7 @@ from bokeh.tile_providers import get_provider, Vendors
 def generate(width,
              height,
              bounds,
-             glymphs=None,
+             glyphs=None,
              active_scroll="wheel_zoom"):
     """Map-figure from supplied bokeh input parameters."""
     x_range = Range1d(start=bounds[0],
@@ -44,11 +44,11 @@ def generate(width,
     tile_provider = get_provider(Vendors.CARTODBPOSITRON)
     map_fig.add_tile(tile_provider, name="background")
 
-    if glymphs:
-        for glymph in glymphs:
-            glymph_type = glymph["type"]
-            glymph.pop("type")
-            getattr(map_fig, glymph_type)(**glymph)
+    if glyphs:
+        for glyph in glyphs:
+            glyph_type = glyph["type"]
+            glyph.pop("type")
+            getattr(map_fig, glyph_type)(**glyph)
         map_fig.legend.click_policy = "hide"
 
     return map_fig

@@ -9,6 +9,7 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 import requests
+from fewsbokeh.time import Timer
 
 _GEODATUM_MAPPING = {"WGS 1984": "epsg:4326", "Rijks Driehoekstelsel": "epsg:28992"}
 
@@ -19,6 +20,7 @@ _REQUEST_PARAMETERS_ALLOWED = {
         "endTime",
         "filterId",
         "parameterIds",
+        "qualifierIds",
         "documentVersion",
         "thinning",
         "onlyHeaders",
@@ -40,32 +42,35 @@ class Api:
         self.parameters = None
         self.locations = None
         self.logger = logger
-
+        self.timer = Timer(logger)
         self._get_parameters(filterId)
 
     def _get_parameters(self, filterId):
         rest_url = f"{self.url}parameters"
         parameters = dict(filterId=filterId,
                           documentFormat=self.document_format)
+        self.timer.reset()
         response = requests.get(rest_url, parameters)
-
+        self.timer.report("Parameters request")
         if response.status_code == 200:
             if "timeSeriesParameters" in response.json().keys():
                 par_df = pd.DataFrame(response.json()["timeSeriesParameters"])
                 par_df.set_index("id", inplace=True)
                 self.parameters = par_df
-                return par_df
+                result = par_df
             else:
-                return None
+                result = None
+        self.timer.report("Parameters parsed")
+        return result
 
     def get_filters(self, filterId=None):
         """Get filters as dictionary, or sub-filters if a filterId is specified."""
         rest_url = f"{self.url}filters"
 
         parameters = {"documentFormat": self.document_format, "filterId": filterId}
-
+        self.timer.reset()
         response = requests.get(rest_url, parameters)
-
+        self.timer.report("Filters request")
         if response.status_code == 200:
             if "filters" in response.json().keys():
                 filters = {
@@ -74,38 +79,52 @@ class Api:
                     }
                     for item in response.json()["filters"]
                 }
-                return filters
+                result = filters
             else:
                 self.logger.warning('no filter returned')
-                return None
+                result = None
+        self.timer.report("Filters parsed")
+        return result
 
-    def get_parameters(self, filterId, locationIds=None):
+    def get_parameters(self, filterId, startTime, endTime, locationIds=None):
         """Get parameters. FilterId is required. A list of locations optional."""
         result = None
 
         timeseries = self.get_timeseries(
             filterId=filterId,
             locationIds=locationIds,
+            startTime=startTime,
+            endTime=startTime,
             parameterIds=self.parameters.index.to_list(),
             onlyHeaders=True,
         )
 
         if "timeSeries" in timeseries.keys():
-            result = list(
-                set(
-                    [
-                        series["header"]["parameterId"]
-                        for series in timeseries["timeSeries"]
-                    ]
+            ids = list(set([
+                series["header"]["parameterId"] for series in timeseries["timeSeries"]])
                 )
-            )
+            timesteps = {item: [] for item in ids}
+            for series in timeseries["timeSeries"]:
+                parameter_id = series["header"]["parameterId"]
+                timesteps[parameter_id] += [series["header"]["timeStep"]]
+            timesteps = {key: list(map(dict, set(tuple(sorted(
+                d.items())) for d in value))) for key, value in timesteps.items()}
+
+            qualifiers = {item: [] for item in ids}
+            for series in timeseries["timeSeries"]:
+                parameter_id = series["header"]["parameterId"]
+                if "qualifierId" in series["header"].keys():
+                    qualifiers[parameter_id] += [series["header"]["qualifierId"]]
+            qualifiers = {key: [
+                list(x) for x in set(tuple(x) for x in value)]
+                for key, value in qualifiers.items()}
 
         else:
             self.logger.warning(
                 f"no timeSeries in filter {filterId} for locations {locationIds}"
             )
 
-        return result
+        return ids, qualifiers, timesteps
 
     def to_parameter_names(self, parameterIds):
         """Convert parameterIds to names."""
@@ -124,8 +143,9 @@ class Api:
             showAttributes=showAttributes,
             filterId=filterId,
         )
-
+        self.timer.reset()
         response = requests.get(rest_url, parameters)
+        self.timer.report("Locations request")
         if response.status_code == 200:
             gdf = gpd.GeoDataFrame(response.json()["locations"])
             gdf["geometry"] = gdf.apply(
@@ -153,7 +173,7 @@ class Api:
             gdf.index = gdf["locationId"]
 
             self.locations = gdf
-
+            self.timer.report("Locations parsed")
         return gdf
 
     def get_timeseries(
@@ -163,13 +183,13 @@ class Api:
         startTime=None,
         endTime=None,
         parameterIds=None,
+        qualifierIds=None,
         documentVersion=None,
         thinning=None,
         onlyHeaders=False,
         unreliables=False,
     ):
         """Get timeseries within a filter, optionally filtered by other variables."""
-        start = pd.Timestamp.now()
         result = None
         rest_url = f"{self.url}timeseries"
 
@@ -180,16 +200,15 @@ class Api:
         }
 
         parameters.update({"documentFormat": self.document_format})
-        response = requests.get(rest_url, parameters)
 
+        self.timer.reset()
+        response = requests.get(rest_url, parameters)
         if response.status_code == 200:
             if onlyHeaders:
-                delta = pd.Timestamp.now() - start
-                delta = delta.seconds + delta.microseconds / 1000000
-                self.logger.info(f"get timeseries headers in {delta} seconds")
-                return response.json()
-
+                self.timer.report("Timeseries headers request")
+                result = response.json()
             elif "timeSeries" in response.json().keys():
+                self.timer.report("TimeSeries request")
                 result = []
                 for time_series in response.json()["timeSeries"]:
                     ts = {}
@@ -215,23 +234,16 @@ class Api:
                         )
                         ts["events"] = df
                     result += [ts]
-
-                delta = pd.Timestamp.now() - start
-                delta = delta.seconds + delta.microseconds / 1000000
-                self.logger.info(f"get timeseries in {delta} seconds")
-
-                return response.json()["timeZone"], result
-
+                result = response.json()["timeZone"], result
+                self.timer.report("TimeSeries parsed")
             else:
                 self.logger.info("returning emtpy timeseries")
-                return response.json()
-
+                result = response.json()
         else:
             self.logger.error(
                 f"server responded with error ({response.status_code}): {response.text}"
                 f"url send to the server was: {response.url}"
             )
-
         if result is None:
             self.logger.warning("method returns None")
 

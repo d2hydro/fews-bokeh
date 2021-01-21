@@ -18,7 +18,7 @@ def generate(width,
              x_axis_visible=True,
              x_axis_label="",
              y_axis_label="",
-             glymphs=None):
+             glyphs=None):
     """Generate a time-figure from supplied bokeh input parameters."""
     time_hover = HoverTool(tooltips=[("datetime", "@datetime{%F}"),
                                      ("value", "@value")],
@@ -48,13 +48,13 @@ def generate(width,
                                                    )
     time_fig.xaxis.visible = x_axis_visible
 
-    if glymphs:
-        for glymph in glymphs:
-            glymph_type = glymph["type"]
-            glymph.pop("type")
-            getattr(time_fig, glymph_type)(x="datetime", y="value", **glymph)
+    if glyphs:
+        for glyph in glyphs:
+            glyph_type = glyph["type"]
+            glyph.pop("type")
+            getattr(time_fig, glyph_type)(x="datetime", y="value", **glyph)
 
-        if next((True for glymph in glymphs if "legend_label" in glymph.keys()), False):
+        if next((True for glyph in glyphs if "legend_label" in glyph.keys()), False):
             time_fig.legend.click_policy = "hide"
 
     return time_fig
