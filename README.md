@@ -17,5 +17,5 @@ conda activate fewsbokeh
 In the activated environment you will install bokehfews via command prompt:
 
 ```
-pip install .
+pip install -e .
 ```
