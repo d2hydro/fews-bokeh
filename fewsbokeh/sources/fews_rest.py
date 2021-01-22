@@ -24,9 +24,9 @@ _REQUEST_PARAMETERS_ALLOWED = {
         "documentVersion",
         "thinning",
         "onlyHeaders",
+        "showStatistics"
     ]
 }
-
 
 class Api:
     """
@@ -86,45 +86,49 @@ class Api:
         self.timer.report("Filters parsed")
         return result
 
-    def get_parameters(self, filterId, startTime, endTime, locationIds=None):
+    def get_headers(self, filterId, endTime, locationIds=None):
         """Get parameters. FilterId is required. A list of locations optional."""
         result = None
 
         timeseries = self.get_timeseries(
             filterId=filterId,
             locationIds=locationIds,
-            startTime=startTime,
-            endTime=startTime,
+            startTime=endTime,
+            endTime=endTime,
             parameterIds=self.parameters.index.to_list(),
             onlyHeaders=True,
+            showStatistics=True
         )
 
         if "timeSeries" in timeseries.keys():
-            ids = list(set([
-                series["header"]["parameterId"] for series in timeseries["timeSeries"]])
-                )
-            timesteps = {item: [] for item in ids}
-            for series in timeseries["timeSeries"]:
-                parameter_id = series["header"]["parameterId"]
-                timesteps[parameter_id] += [series["header"]["timeStep"]]
-            timesteps = {key: list(map(dict, set(tuple(sorted(
-                d.items())) for d in value))) for key, value in timesteps.items()}
+            result = [ts['header'] for ts in timeseries["timeSeries"]]
 
-            qualifiers = {item: [] for item in ids}
-            for series in timeseries["timeSeries"]:
-                parameter_id = series["header"]["parameterId"]
-                if "qualifierId" in series["header"].keys():
-                    qualifiers[parameter_id] += [series["header"]["qualifierId"]]
-            qualifiers = {key: [
-                list(x) for x in set(tuple(x) for x in value)]
-                for key, value in qualifiers.items()}
+            # ids = list(set([
+            #     series["header"]["parameterId"] for series in timeseries["timeSeries"]])
+            #     )
+            # timesteps = {item: [] for item in ids}
+            # for series in timeseries["timeSeries"]:
+            #     parameter_id = series["header"]["parameterId"]
+            #     timesteps[parameter_id] += [series["header"]["timeStep"]]
+            # timesteps = {key: list(map(dict, set(tuple(sorted(
+            #     d.items())) for d in value))) for key, value in timesteps.items()}
+
+            # qualifiers = {item: [] for item in ids}
+            # for series in timeseries["timeSeries"]:
+            #     parameter_id = series["header"]["parameterId"]
+            #     if "qualifierId" in series["header"].keys():
+            #         qualifiers[parameter_id] += [series["header"]["qualifierId"]]
+            # qualifiers = {key: [
+            #     list(x) for x in set(tuple(x) for x in value)]
+            #     for key, value in qualifiers.items()}
 
         else:
             self.logger.warning(
                 f"no timeSeries in filter {filterId} for locations {locationIds}"
             )
+            result = None
 
-        return ids, qualifiers, timesteps
+        return result
 
     def to_parameter_names(self, parameterIds):
         """Convert parameterIds to names."""
@@ -188,11 +192,12 @@ class Api:
         thinning=None,
         onlyHeaders=False,
         unreliables=False,
+        showStatistics=False
     ):
         """Get timeseries within a filter, optionally filtered by other variables."""
         result = None
         rest_url = f"{self.url}timeseries"
-
+        #print(f"thinning: {thinning}")
         parameters = {
             key: value
             for key, value in locals().items()
@@ -200,9 +205,10 @@ class Api:
         }
 
         parameters.update({"documentFormat": self.document_format})
-
         self.timer.reset()
+        #print(parameters)
         response = requests.get(rest_url, parameters)
+        #print(response.url)
         if response.status_code == 200:
             if onlyHeaders:
                 self.timer.report("Timeseries headers request")

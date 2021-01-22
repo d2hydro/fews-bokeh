@@ -10,10 +10,11 @@ from config import (
 
 from fewsbokeh import map_figure, time_figure
 import logging
-
+from bokeh.plotting import figure
 from bokeh import events
 from bokeh.io import curdoc
 from bokeh.models.widgets import (
+    Div,
     Select,
     Panel,
     Tabs,
@@ -22,7 +23,7 @@ from bokeh.models.widgets import (
     Slider,
     DateRangeSlider
 )
-
+from bokeh.models import ColumnDataSource, Range1d
 from bokeh.layouts import row, column, widgetbox
 import ctypes
 import numpy as np
@@ -76,7 +77,7 @@ def _clean_filters():
     select_parameters.value = parameters_select
 
     # clean qualifiers filter
-    select_qualifiers.options = data.parameters.qualifier_names(parameters_select)
+    select_qualifiers.options = data.timeseries.qualifier_names(parameters_select)
     qualifiers_select = [val for val in
                          select_qualifiers.value
                          if val in select_qualifiers.options]
@@ -84,72 +85,127 @@ def _clean_filters():
     select_qualifiers.value = qualifiers_select
 
     # clean timesteps filter
-    select_timesteps.options = data.parameters.timestep_names(parameters_select)
+    select_timesteps.options = data.timeseries.timestep_names(parameters_select)
     timesteps_select = [val for val in
                         select_timesteps.value
                         if val in select_timesteps.options]
 
     select_timesteps.value = timesteps_select
 
-
-def _update_timefig():
+def _create_timefig():
     if all([select_locations.value,
-           select_parameters.value,
-           select_timesteps.value]):
+       select_parameters.value,
+       select_timesteps.value]):
         search_parameter.options = select_parameters.value
         search_parameter.value = select_parameters.value[0]
-        data.update_timeseries(select_locations.value,
+        data.parameters.search_parameter = search_parameter.value
+        data.create_timeseries(select_locations.value,
                                select_parameters.value,
                                select_qualifiers.value,
                                select_timesteps.value)
-        #_create_timefig()
+        logger.debug("event: _create_time_fig")
+        _remove_timefig()
 
+        # difine top-figs
+        top_figs = []
+        glyphs = data.timeseries.hr_glyphs
+        fig_height = int(height * 0.75 * 0.85 / len(glyphs))
+        hr_x_range = Range1d(start=data.timeseries.x_bounds['start'],
+                             end=data.timeseries.x_bounds['end'],
+                             bounds="auto")
+        for idx, (key, values) in enumerate(glyphs.items()):
+            if idx == 0:
+                fig_title = ",".join(select_locations.value)
+            else:
+                fig_title = ""
 
-def _create_timefig():
-    logger.debug("event: _update_time_fig")
-    _remove_timefig()
-    time_figs = []
-    glyphs = data.timeseries.glyphs
-    fig_height = int(height * 0.75 / len(glyphs))
+            if len(select_parameters.value) == 1:
+                y_axis_label = select_parameters.value[0]
+            else:
+                fews_parameters = data.fews_api.parameters
+                unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
+                    "displayUnit"
+                ].to_list()[0]
+                y_axis_label = f"{key} [{unit}]"
 
-    for idx, (key, values) in enumerate(glyphs.items()):
-        if idx == 0:
-            fig_title = data.timeseries.title
-        else:
-            fig_title = ""
+            graph = data.timeseries.hr_graphs[key]
+            top_figs += [time_figure.generate(title=fig_title,
+                                              width=int(width * 0.75),
+                                              height=fig_height,
+                                              x_axis_label=data.timeseries.x_axis_label,
+                                              y_axis_label=y_axis_label,
+                                              x_axis_visible=False,
+                                              x_range=hr_x_range,
+                                              y_bounds=graph['y_bounds'],
+                                              glyphs=values,
+                                              )]
+        # define search fig
+        glyph = data.timeseries.lr_glyph
+        x_bounds = {"start": search_period_slider.value[0],
+                    "end": search_period_slider.value[1]}
 
-        if idx == len(glyphs) - 1:
-            x_axis_visible = True
-        else:
-            x_axis_visible = False
+        y_bounds = {"start": 0, "end": 1}
+        if len(glyph['source'].data['value']) > 0:
+            y_bounds["start"] = glyph['source'].data['value'].min()
+            y_bounds["end"] = glyph['source'].data['value'].max()
 
-        if len(select_parameters.value) == 1:
-            y_axis_label = select_parameters.value[0]
-        else:
-            fews_parameters = data.fews_api.parameters
-            unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
-                "displayUnit"
-            ].to_list()[0]
-            y_axis_label = f"{key} [{unit}]"
+        lr_x_range = Range1d(start=x_bounds['start'],
+                             end=x_bounds['end'],
+                             bounds="auto")
+        lr_fig = time_figure.generate(width=int(width * 0.75),
+                                      height=int(height * 0.15 * 0.75),
+                                      x_axis_label=data.timeseries.x_axis_label,
+                                      y_axis_label="",
+                                      x_axis_visible=True,
+                                      x_range=lr_x_range,
+                                      y_bounds=y_bounds,
+                                      show_toolbar=False,
+                                      glyphs=[glyph])
 
-        graph = data.timeseries.graphs[key]
-        time_figs += [time_figure.generate(title=fig_title,
-                                           width=int(width * 0.75),
-                                           height=fig_height,
-                                           x_axis_label=data.timeseries.x_axis_label,
-                                           y_axis_label=y_axis_label,
-                                           x_axis_visible=x_axis_visible,
-                                           x_bounds=data.timeseries.x_bounds,
-                                           y_bounds=graph['y_bounds'],
-                                           glyphs=values,
-                                           )]
+        patch_src = ColumnDataSource({'x': [data.timeseries.x_bounds["start"],
+                                            data.timeseries.x_bounds["start"],
+                                            data.timeseries.x_bounds["end"],
+                                            data.timeseries.x_bounds["end"]],
+                                      'y': [lr_fig.y_range.start,
+                                            lr_fig.y_range.end,
+                                            lr_fig.y_range.end,
+                                            lr_fig.y_range.start]}
+                                     )
+        search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
+        search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
 
-    tabs.tabs.append(Panel(child=column(*time_figs),
-                           title="grafiek",
-                           name="grafiek")
-                     )
+        lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
 
-    _activate_timefig()
+        lr_fig.toolbar_location = None
+        lr_fig.ygrid.visible = False
+        lr_fig.yaxis[0].ticker = [y_bounds['start'], y_bounds['end']]
+        lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
+
+        # define daterange slider
+        end_datetime = pd.Timestamp(search_period_slider.value[1]*1000000)
+        start_datetime = end_datetime - pd.DateOffset(days=7)
+
+        date_range_slider = DateRangeSlider(value=(start_datetime,
+                                                   end_datetime),
+                                            start=search_period_slider.value[0],
+                                            end=search_period_slider.value[1],
+                                            width=int(width * 0.75) - 65)
+
+        date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
+        date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
+
+        tabs.tabs.append(Panel(child=column(*top_figs,
+                                            lr_fig,
+                                            row(Div(width=30, text=""),
+                                                date_range_slider)),
+                               title="grafiek",
+                               name="grafiek"))
+
+        # tabs.tabs.append(Panel(child=column(top_figs[0]),
+        #                        title="grafiek",
+        #                        name="grafiek"))
+    
+        #_activate_timefig()
 
 
 def update_on_double_tap(event):
@@ -201,7 +257,7 @@ def update_on_locations_select(attrname, old, new):
     _clean_filters()
 
     # update timefig (if locs, pars, qualifiers, and timesteps are selected)
-    _update_timefig()
+    _create_timefig()
 
 
 def update_on_parameters_select(attrname, old, new):
@@ -212,7 +268,7 @@ def update_on_parameters_select(attrname, old, new):
     _clean_filters()
 
     # update timefig (if locs, pars, qualifiers, and timesteps are selected)
-    _update_timefig()
+    _create_timefig()
 
 
 def update_on_qualifiers_select(attrname, old, new):
@@ -223,7 +279,7 @@ def update_on_qualifiers_select(attrname, old, new):
     _clean_filters()
 
     # update timefig (if locs, pars, qualifiers, and timesteps are selected)
-    _update_timefig()
+    _create_timefig()
 
 
 def update_on_timesteps_select(attrname, old, new):
@@ -234,7 +290,7 @@ def update_on_timesteps_select(attrname, old, new):
     _clean_filters()
 
     # update timefig (if locs, pars, qualifiers, and timesteps are selected)
-    _update_timefig()
+    _create_timefig()
 
 
 def update_on_year_slider(attrname, old, new):
@@ -325,7 +381,7 @@ select_qualifiers = MultiSelect(title="Qualifiers:",
                                 value=[],
                                 options=[])
 
-select_qualifiers.height = int(height * 0.06)
+select_qualifiers.height = int(height * 0.08)
 
 select_qualifiers.on_change("value", update_on_qualifiers_select)
 
@@ -339,17 +395,9 @@ select_timesteps.height = int(height * 0.06)
 select_timesteps.on_change("value", update_on_timesteps_select)
 
 # %% define search period selection
-
-seach_year_slider = Slider(start=data.end_datetime.year - SEARCH_YEARS,
-                           end=data.end_datetime.year,
-                           value=data.end_datetime.year,
-                           step=1,
-                           title="Zoekjaar")
-
-seach_year_slider.on_change("value", update_on_year_slider)
-
-search_period_slider = DateRangeSlider(value=(data.start_datetime, data.end_datetime),
-                                       start=data.start_datetime,
+search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
+                                              data.end_datetime),
+                                       start=data.first_value_datetime,
                                        end=data.end_datetime,
                                        title="Zoekperiode")
 
@@ -358,17 +406,48 @@ search_parameter = Select(title="Zoekparameter:",
                           options=[])
 
 # %% define layout
+
 map_panel = Panel(child=map_fig, title="kaart", name="kaart")
 tabs = Tabs(tabs=[map_panel])
 
-layout = row(column(select_filter,
-                    select_locations,
-                    select_parameters,
-                    select_qualifiers,
+div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling! (laatste update: 22-01-2021)<b></p>""", height=int(height * 0.05))
+
+layout = column(div,row(column(select_filter,
+                           select_locations,
+                           select_parameters,
+                           select_qualifiers,
                     select_timesteps,
-                    seach_year_slider,
                     search_period_slider,
-                    search_parameter), tabs)
+                    search_parameter), tabs))
 
 curdoc().add_root(layout)
 curdoc().title = TITLE
+
+
+"""
+location_ids, parameter_ids, search_parameter_id, qualifier_ids, timesteps, filter_id, parameter_groups = [['1110'],
+                                                                                        ['P.radar.cal'],
+                                                                                        'P.radar.cal',
+                                                                                        [],
+                                                                                        [['300', 'second']],
+                                                                                        'Hydronet_Keten',
+                                                                                        ['Radar Neerslag']]
+
+data.timeseries.update(
+                   location_ids,
+                   parameter_ids,
+                   search_parameter_id,
+                   qualifier_ids,
+                   timesteps,
+                   filter_id,
+                   parameter_groups)
+
+# add search graph
+glyphs = list(data.timeseries.hr_glyphs.values())[0]
+time_fig = figure()
+
+for glyph in glyphs:
+    time_fig.line(x="datetime", y="value", source=glyph['source'])
+
+curdoc().add_root(time_fig)
+"""

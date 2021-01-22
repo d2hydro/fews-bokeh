@@ -1,9 +1,14 @@
 """Datamodel for Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
+from server_config import URL
+
 from config import (
-    URL,
     MAP_BUFFER,
     FILTER_PARENT,
-    EXCLUDE_PARS
+    EXCLUDE_PARS,
+    NOW,
+    SEARCH_YEARS,
+    FILTER_MONTHS,
+    TIMESERIES_DAYS
 )
 
 from itertools import cycle
@@ -38,9 +43,14 @@ class Data(object):
     def __init__(self, filterId, logger):
         self.logger = logger
         self.timer = Timer(logger)
-        self.now = pd.Timestamp.now()
+        self.now = NOW
         self.end_datetime = self.now
-        self.start_datetime = self.end_datetime - pd.DateOffset(years=1)
+        self.start_datetime = self.end_datetime - pd.DateOffset(
+            days=TIMESERIES_DAYS)
+        self.first_value_datetime = self.end_datetime - pd.DateOffset(
+            years=SEARCH_YEARS)
+        self.search_start_datetime = self.end_datetime - pd.DateOffset(
+            months=FILTER_MONTHS)
         self.fews_api = fews_rest.Api(URL, logger, filterId)
         self.timer.report("FEWS-API initiated")
         self.filters = self.Filters(filterId,
@@ -59,8 +69,10 @@ class Data(object):
         self.timer.report("parameters initiated")
         self.timeseries = self.TimeSeries(self.fews_api,
                                           logger,
+                                          self.end_datetime,
                                           self.start_datetime,
-                                          self.end_datetime)
+                                          self.search_start_datetime,
+                                          self.first_value_datetime)
         self.timer.reset("init finished")
 
     def include_child_locations(self, location_ids):
@@ -77,7 +89,9 @@ class Data(object):
 
         self.filters.update(filter_id)
         self.locations.update(filter_id)
-        self.parameters.update(filter_id)
+        parameter_ids = self.fews_api._get_parameters(
+            filterId=filter_id).index.to_list()
+        self.parameters.update(parameter_ids)
 
     def update_locations_select(self, location_names):
         """Update datamodel on selected locations."""
@@ -86,10 +100,13 @@ class Data(object):
 
         if location_ids:
             location_ids = self.include_child_locations(location_ids)
-            self.parameters.update(self.filters.selected['id'],
-                                   locationIds=location_ids,
-                                   start_datetime=self.start_datetime,
-                                   end_datetime=self.start_datetime)
+            headers = self.fews_api.get_headers(
+                filterId=self.filters.selected['id'],
+                endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                locationIds=location_ids)
+
+            self.timeseries.headers = headers
+            self.parameters.update(list(set([item['parameterId'] for item in headers])))
 
     def update_parameters_select(self, parameter_names):
         """Update datamodel on selected locations."""
@@ -109,13 +126,13 @@ class Data(object):
     def update_search_dates(self, offset_years):
         """Update datamodel when offsets search-period."""
         offset_sign = np.sign(offset_years)
-        self.start_datetime = self.start_datetime + offset_sign * pd.DateOffset(
+        self.first_value_datetime = self.first_value_datetime + offset_sign * pd.DateOffset(
             years=abs(offset_years))
 
         self.end_datetime = self.end_datetime + offset_sign * pd.DateOffset(
             years=abs(offset_years))
 
-    def update_timeseries(self, location_names, parameter_names, qualifiers, timesteps):
+    def create_timeseries(self, location_names, parameter_names, qualifiers, timesteps):
         """Update timeseries."""
 #        print(location_names, parameter_names, qualifiers, timesteps)
         self.logger.debug("bokeh: _update_time_fig")
@@ -130,12 +147,19 @@ class Data(object):
         qualifiers = [item.split(" ") for item in qualifiers]
         timesteps = [item.split(" ") for item in timesteps]
 
-        self.timeseries.update(location_ids,
+        parameter_groups = self.fews_api.parameters.loc[
+            parameter_ids]["parameterGroup"].to_list()
+
+        search_parameter_id = self.fews_api.to_parameter_ids(
+            [self.parameters.search_parameter])[0]
+
+        self.timeseries.create(location_ids,
                                parameter_ids,
+                               search_parameter_id,
                                qualifiers,
                                timesteps,
                                self.filters.selected['id'],
-                               self.parameters.groups)
+                               parameter_groups)
 
     class Filters(object):
         """Available filters."""
@@ -250,56 +274,15 @@ class Data(object):
             self.groups = None
             self.ids = None
             self.names = None
+            self.search_parameter = None
             self.timesteps = dict()
             self.qualifiers = dict()
             self.exclude = exclude
-            self.update(filterId, locationIds=locationIds)
+            self.update(fews_api._get_parameters(filterId).index.to_list())
 
-        def timestep_names(self, parameter_names=None):
-            """Extract timestep names from timesteps."""
-            timesteps = self.timesteps
-            if parameter_names:
-                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-                timesteps = {key: item for key, item in timesteps.items()
-                             if key in parameter_ids}
-            timesteps = [
-                item for sublist in timesteps.values() for item in sublist]
-            names = [" ".join(item.values()) for item in timesteps]
-            return list(set(names))
-
-        def qualifier_names(self, parameter_names=None):
-            """Extract qualifier names from qualifiers."""
-            qualifiers = self.qualifiers
-            if parameter_names:
-                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-                qualifiers = {key: item for key, item in qualifiers.items()
-                              if key in parameter_ids}
-
-            qualifiers = [item for sublist in qualifiers.values() for item in sublist]
-
-            names = [" ".join(item) for item in qualifiers]
-            return list(set(names))
-
-        def update(self,
-                   filterId,
-                   start_datetime=None,
-                   end_datetime=None,
-                   locationIds=[]):
+        def update(self, locationIds):
             """Update locations by filterId."""
-            if locationIds:
-                if start_datetime:
-                    startTime = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    endTime = end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
-                self.ids, self.qualifiers, self.timesteps = self.fews_api.get_parameters(filterId=filterId,
-                                                                                         startTime=startTime,
-                                                                                         endTime=endTime,
-                                                                                         locationIds=locationIds)
-
-            else:
-                self.ids = self.fews_api._get_parameters(
-                    filterId=filterId).index.to_list()
-
-            self.ids = [par for par in self.ids if par not in self.exclude]
+            self.ids = [par for par in locationIds if par not in self.exclude]
             self.names = self.fews_api.to_parameter_names(self.ids)
             self.groups = self.fews_api.parameters.loc[
                 self.ids]["parameterGroup"].to_list()
@@ -307,34 +290,110 @@ class Data(object):
     class TimeSeries(object):
         """TimeSeries data."""
 
-        def __init__(self, fews_api, logger, start_datetime, end_datetime):
-            self.data = None
+        def __init__(self,
+                     fews_api,
+                     logger,
+                     end_datetime,
+                     start_datetime,
+                     search_start_datetime,
+                     first_value_datetime):
+            self.hr_data = None
+            self.lr_data = None
             self.fews_api = fews_api
             self.logger = logger
             self.start_datetime = start_datetime
             self.end_datetime = end_datetime
+            self.search_start_datetime = search_start_datetime
+            self.first_value_datetime = first_value_datetime
             self.time_zone = None
             self.time_series = None
+            self.headers = None
             self.title = None
-            self.graphs = None
+            self.hr_graphs = None
             self.x_bounds = None
-            self.glyphs = None
+            self.hr_glyphs = None
+            self.lr_glyph = None
 
-        def update(self,
+        def timestep_names(self, parameter_names=None):
+            """Extract timestep names from timesteps."""
+            headers = self.headers
+            if parameter_names:
+                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
+                headers = [item for item in headers
+                           if item['parameterId'] in parameter_ids]
+
+            names = []
+            for header in headers:
+                name = ""
+                timestep = header['timeStep']
+                if "multiplier" in timestep.keys():
+                    name += f"{timestep['multiplier']} "
+                name += timestep["unit"]
+
+            names += [name]
+            names = list(set(names))
+            names.sort()
+            return names
+
+        def qualifier_names(self, parameter_names=None):
+            """Extract qualifier names from qualifiers."""
+            headers = self.headers
+            if parameter_names:
+                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
+                headers = [item for item in headers
+                           if item['parameterId'] in parameter_ids]
+
+            names = []
+            for item in headers:
+                if 'qualifierId' in item.keys():
+                    names += [" ".join(item['qualifierId'])]
+                else:
+                    names += [" "]
+            names = list(set(names))
+            names.sort()
+            return names
+
+        def create(self,
                    location_ids,
                    parameter_ids,
+                   search_parameter_id,
                    qualifier_ids,
                    timesteps,
                    filter_id,
                    parameter_groups):
             """Update timeseries data."""
-            print(location_ids, parameter_ids, qualifier_ids, timesteps, filter_id, parameter_groups)
-            timespan = (self.start_datetime - self.start_datetime).days
+            # create low resolution glyph
+            #print(location_ids, parameter_ids, search_parameter_id, qualifier_ids, timesteps, filter_id, parameter_groups)
+            if not qualifier_ids:
+                qualifier_ids = " "
+            timespan = (self.end_datetime - self.search_start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
             colors = cycle(palette)
 
+            _, self.lr_data = self.fews_api.get_timeseries(
+                filterId=filter_id,
+                locationIds=location_ids,
+                qualifierIds=qualifier_ids,
+                parameterIds=search_parameter_id,
+                startTime=self.search_start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                thinning=thinner)
+            # print(self.lr_data)
+            # get the first timeseries with data, otherwise return empty
+            df = next((ts['events'] for ts in self.lr_data if not ts[
+                'events'].empty), {"datetime": [], "value": []})
+
+            self.lr_glyph = {"type": "line",
+                             "color": next(colors),
+                             "source": ColumnDataSource(df)}
+
+            # create high resolution glyphs
             # get all timeseries from api
-            self.time_zone, self.data = self.fews_api.get_timeseries(
+            timespan = (self.end_datetime - self.start_datetime).days
+            thinner = int(timespan * 86400 * 1000 / width)
+
+            # download data
+            self.time_zone, self.hr_data = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
                 qualifierIds=qualifier_ids,
@@ -342,70 +401,42 @@ class Data(object):
                 startTime=self.start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 thinning=thinner)
-"""
-            parameter_groups = self.fews_api.parameters.loc[
-                parameter_ids]["parameterGroup"].to_list()
 
-            self.glyphs = {group: [] for group in parameter_groups}
-            self.graphs = {group: {"x_axis_visible": [],
-                                   "x_bounds": {'start': [], 'end': []},
-                                   "y_bounds": {'start': [], 'end': []}}
-                           for group in parameter_groups}
+            # initalize results
+            self.hr_glyphs = {group: [] for group in parameter_groups}
+            self.hr_graphs = {group: {
+                "x_bounds": {'start': self.start_datetime, 'end': self.end_datetime},
+                "y_bounds": {'start': [], 'end': []}}
+                              for group in parameter_groups}
 
-            # assign a color-scheme
-            color_df = pd.DataFrame(
-                [
-                    dict(
-                        location=ts["header"]["locationId"],
-                        parameter=ts["header"]["parameterId"],
-                        ts_unit=ts["header"]["timeStep"]["unit"],
-                        group=self.fews_api.parameters.loc[ts["header"]["parameterId"]][
-                            "parameterGroup"
-                        ],
-                    )
-                    for ts in self.data
-                ]
-                )
-            color_df.sort_values(
-                by=["group", "parameter", "ts_unit", "location"], inplace=True
-            )
-            color_df.set_index(["group", "location", "parameter", "ts_unit"],
-                               inplace=True)
-            color_df["color"] = None
-            grouper = color_df.groupby("group")
-            for _, df in grouper:
-                for idx, row in df.iterrows():
-                    color_df.loc[idx, "color"] = next(colors)
-
+            colors = cycle(palette)
             x_bounds = {'start': [], 'end': []}
-            for ts in self.data:
+            for ts in self.hr_data:
                 if "events" in ts.keys():
-                    header = ts["header"]
-                    group = self.fews_api.parameters.loc[header["parameterId"]][
-                        "parameterGroup"]
-                    location = header["locationId"]
-                    parameter = header["parameterId"]
-                    ts_unit = header["timeStep"]["unit"]
-                    color = color_df.loc[group, location, parameter, ts_unit]["color"]
-                    short_name = self.fews_api.locations.loc[header[
-                        "locationId"]]["shortName"]
-                    parameter_name = self.fews_api.parameters.loc[header[
-                        "parameterId"]]["name"]
-                    unit_name = _UNITS_MAPPING[header["timeStep"]["unit"]]
-                    self.glyphs[group] += [
-                        {"type": "line",
-                         "color": color,
-                         "source": ColumnDataSource(ts["events"]),
-                         "legend_label": f"{short_name} {parameter_name} [{unit_name}]"}
-                                            ]
-                    self.glyphs[group] += []
                     if not ts["events"].empty:
-                        x_bounds['start'] += [ts["events"]["datetime"].min()]
-                        x_bounds['end'] += [ts["events"]["datetime"].max()]
-                        self.graphs[group]['y_bounds']['start'] += [ts["events"]
-                                                                    ["value"].min()]
-                        self.graphs[group]['y_bounds']['end'] += [ts["events"]
-                                                                  ["value"].max()]
+                        header = ts["header"]
+                        timestep = list(header["timeStep"].values())
+                        timestep.reverse()
+                        if timestep in timesteps:
+                            group = self.fews_api.parameters.loc[header["parameterId"]][
+                                "parameterGroup"]
+                            color = next(colors)
+                            short_name = self.fews_api.locations.loc[header[
+                                "locationId"]]["shortName"]
+                            parameter_name = self.fews_api.parameters.loc[header[
+                                "parameterId"]]["name"]
+                            self.hr_glyphs[group] += [
+                                {"type": "line",
+                                 "color": color,
+                                 "source": ColumnDataSource(ts["events"]),
+                                 "legend_label": f"{short_name} {parameter_name}"}
+                                                    ]
+                            x_bounds['start'] += [ts["events"]["datetime"].min()]
+                            x_bounds['end'] += [ts["events"]["datetime"].max()]
+                            self.hr_graphs[group]['y_bounds']['start'] += [
+                                ts["events"]["value"].min()]
+                            self.hr_graphs[group]['y_bounds']['end'] += [
+                                ts["events"]["value"].max()]
 
             self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
                 int(float(self.time_zone)))
@@ -421,16 +452,19 @@ class Data(object):
                 x_bounds['end'] = self.end_datetime
 
             self.x_bounds = x_bounds
-            for group in self.glyphs.keys():
-                if len(self.graphs[group]['y_bounds']['start']) > 0:
-                    self.graphs[group]['y_bounds']['start'] = min(self.graphs[group]
-                                                                  ['y_bounds']['start'])
+            for group in self.hr_glyphs.keys():
+                if len(self.hr_graphs[group]['y_bounds']['start']) > 0:
+                    self.hr_graphs[group]['y_bounds']['start'] = min(
+                        self.hr_graphs[group]['y_bounds']['start'])
                 else:
-                    self.graphs[group]['y_bounds']['start']
+                    self.hr_graphs[group]['y_bounds']['start'] = 0
 
-                if len(self.graphs[group]['y_bounds']['end']) > 0:
-                    self.graphs[group]['y_bounds']['end'] = max(self.graphs[group]
-                                                                ['y_bounds']['end'])
+                if len(self.hr_graphs[group]['y_bounds']['end']) > 0:
+                    self.hr_graphs[group]['y_bounds']['end'] = max(
+                        self.hr_graphs[group]['y_bounds']['end'])
                 else:
-                    self.graphs[group]['y_bounds']['end'] = 1
-"""
+                    self.hr_graphs[group]['y_bounds']['end'] = 1
+                if self.hr_graphs[group]['y_bounds'][
+                        'end'] == self.hr_graphs[group]['y_bounds']['start']:
+                    self.hr_graphs[group]['y_bounds']['end'] += 0.1
+                    self.hr_graphs[group]['y_bounds']['start'] -= 0.1
