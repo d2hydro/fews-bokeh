@@ -28,3 +28,9 @@ path_to_python_installation\envs\fewsbokeh\python.exe -m bokeh serve wik --port 
 ```
 
 Here path_to_python_installation is the directory where python is installed, e.g. c:\Anaconda3
+
+Depending on the specified SERVER parameter (in this case localhost) and port (in this case 5002) your app can be launched in de browser:
+
+```
+http://localhost:5002/wik
+```
