@@ -1,4 +1,5 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
+from serve_config import SERVER
 
 from config import (
     TITLE,
@@ -119,6 +120,11 @@ def _create_timefig():
             else:
                 fig_title = ""
 
+            if idx == len(glyphs.items()) - 1:
+                x_axis_visible = True
+            else:
+                x_axis_visible = False
+
             if len(select_parameters.value) == 1:
                 y_axis_label = select_parameters.value[0]
             else:
@@ -132,9 +138,9 @@ def _create_timefig():
             top_figs += [time_figure.generate(title=fig_title,
                                               width=int(width * 0.75),
                                               height=fig_height,
-                                              x_axis_label=data.timeseries.x_axis_label,
+                                              x_axis_label="",
                                               y_axis_label=y_axis_label,
-                                              x_axis_visible=False,
+                                              x_axis_visible=x_axis_visible,
                                               x_range=hr_x_range,
                                               y_bounds=graph['y_bounds'],
                                               glyphs=values,
