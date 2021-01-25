@@ -1,5 +1,5 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from serve_config import SERVER
+from server_config import SERVER
 
 from config import (
     TITLE,
