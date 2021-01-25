@@ -4,9 +4,9 @@ from server_config import SERVER
 from config import (
     TITLE,
     LOG_LEVEL,
-    SERVER,
     FILTER_SELECTED,
-    SEARCH_YEARS
+    SEARCH_YEARS,
+    LOG_FILE
 )
 
 from fewsbokeh import map_figure, time_figure
@@ -299,19 +299,14 @@ def update_on_timesteps_select(attrname, old, new):
     _create_timefig()
 
 
-def update_on_year_slider(attrname, old, new):
-    """Update when year slider changes."""
-    year = seach_year_slider.value
-    offset_years = int(year - pd.Timestamp(search_period_slider.value[1]*1000000).year)
-    data.update_search_dates(offset_years)
-    search_period_slider.start = data.start_datetime
-    search_period_slider.end = data.end_datetime
-    search_period_slider.value = _datetime_offset(
-        search_period_slider.value, offset_years)
-
-
+log_dir = LOG_FILE.parent
+log_dir.mkdir(exist_ok=True)
+logFormatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL))
+fh = logging.FileHandler(LOG_FILE)
+fh.setFormatter(logFormatter)
+logger.addHandler(fh)
 
 # %% allow origin to server address
 os.environ['BOKEH_ALLOW_WS_ORIGIN'] = SERVER
