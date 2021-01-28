@@ -96,6 +96,21 @@ def _clean_filters():
 
 
 def _create_timefig():
+    """Create a time-fig."""
+    def _update_on_date_range(attrname, old, new):
+        """Update triggered by date_range_sider throttled."""
+        start_datetime = pd.to_datetime(date_range_slider.value[0] * 1000000)
+        end_datetime = pd.to_datetime(date_range_slider.value[1] * 1000000)
+
+        patch_src.data.update({'x': [start_datetime,
+                                     start_datetime,
+                                     end_datetime,
+                                     end_datetime],
+                               'y': [lr_fig.y_range.start,
+                                     lr_fig.y_range.end,
+                                     lr_fig.y_range.end,
+                                     lr_fig.y_range.start]})
+
     if all([select_locations.value,
        select_parameters.value]):
         search_parameter.options = select_parameters.value
@@ -194,16 +209,19 @@ def _create_timefig():
                                                    end_datetime),
                                             start=search_period_slider.value[0],
                                             end=search_period_slider.value[1],
-                                            width=int(width * 0.75) - 65)
+                                            width=int(width * 0.75) - 80)
 
         date_range_slider.format = '%d-%m-%Y'
 
         date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
         date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
+        date_range_slider.on_change("value", _update_on_date_range)
+        hr_x_range.x_range.js_link('start', date_range_slider, 'start')
+        hr_x_range.x_range.js_link('end', date_range_slider, 'end')
 
         tabs.tabs.append(Panel(child=column(*top_figs,
                                             lr_fig,
-                                            row(Div(width=30, text=""),
+                                            row(Div(width=40, text=""),
                                                 date_range_slider)),
                                title="grafiek",
                                name="grafiek"))
@@ -410,7 +428,7 @@ map_panel = Panel(child=map_fig, title="kaart", name="kaart")
 tabs = Tabs(tabs=[map_panel])
 
 div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
-          (laatste update: 22-01-2021)<b></p>""", height=int(height * 0.05))
+          (laatste update: 28-01-2021)<b></p>""", height=int(height * 0.05))
 
 layout = column(div, row(column(select_filter,
                                 select_locations,

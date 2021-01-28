@@ -13,8 +13,7 @@ FILTER_MONTHS = 3
 TIMESERIES_DAYS = 7
 FILTER_PARENT = "Export_Hydronet"
 FILTER_SELECTED = "Hydronet_Keten"
-NOW = pd.Timestamp(year=2020, month=6, day=1)
 LOG_LEVEL = "DEBUG"
-EXCLUDE_PARS = ["Dummy"]
-LOG_FILE = config_dir.joinpath("..", "log",
-                               f"log_{pd.Timestamp.now().strftime('%Y%m%dT%H%M%S')}.txt").resolve()
+EXCLUDE_PARS = ["Dummy", "P.radar.cal.early", "P.radar.cal.realtime"]
+LOG_FILE = config_dir.joinpath(
+    "..", "log", f"log_{pd.Timestamp.now().strftime('%Y%m%dT%H%M%S')}.txt").resolve()

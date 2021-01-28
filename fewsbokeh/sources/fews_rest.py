@@ -89,16 +89,18 @@ class Api:
         self.timer.report("Filters parsed")
         return result
 
-    def get_headers(self, filterId, endTime, locationIds=None):
+    def get_headers(self, filterId, endTime, parameterIds=None, locationIds=None):
         """Get parameters. FilterId is required. A list of locations optional."""
         result = None
 
+        if not parameterIds:
+            parameterIds = self.parameters.index.to_list()
         timeseries = self.get_timeseries(
             filterId=filterId,
             locationIds=locationIds,
             startTime=endTime,
             endTime=endTime,
-            parameterIds=self.parameters.index.to_list(),
+            parameterIds=parameterIds,
             onlyHeaders=True,
             showStatistics=True
         )

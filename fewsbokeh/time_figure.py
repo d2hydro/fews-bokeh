@@ -21,6 +21,7 @@ def generate(width,
              x_axis_label="",
              y_axis_label="",
              show_toolbar=True,
+             bound_limits=None,
              glyphs=None):
     """Generate a time-figure from supplied bokeh input parameters."""
     time_hover = HoverTool(tooltips=[("datetime", "@datetime{%F}"),
@@ -30,9 +31,13 @@ def generate(width,
     tools = ["pan", "box_zoom", "xwheel_zoom", "reset", time_hover, "save"]
 
     if not x_range:
-        x_range = Range1d(start=x_bounds['start'], end=x_bounds['end'], bounds="auto")
+        x_range = Range1d(start=x_bounds['start'],
+                          end=x_bounds['end'],
+                          bounds=bound_limits)
     if not y_range:
-        y_range = Range1d(start=y_bounds['start'], end=y_bounds['end'], bounds="auto")
+        y_range = Range1d(start=y_bounds['start'],
+                          end=y_bounds['end'],
+                          bounds=bound_limits)
     time_fig = figure(title=title,
                       tools=tools,
                       active_drag=None,

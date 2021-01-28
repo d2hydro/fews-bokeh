@@ -1,11 +1,10 @@
 """Datamodel for Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from server_config import URL
+from server_config import URL, NOW
 
 from config import (
     MAP_BUFFER,
     FILTER_PARENT,
     EXCLUDE_PARS,
-    NOW,
     SEARCH_YEARS,
     FILTER_MONTHS,
     TIMESERIES_DAYS
@@ -88,10 +87,9 @@ class Data(object):
                          if item['name'] == filter_name)['id']
 
         self.filters.update(filter_id)
-        self.locations.update(filter_id)
-        parameter_ids = self.fews_api._get_parameters(
-            filterId=filter_id).index.to_list()
-        self.parameters.update(parameter_ids)
+        self.locations.fetch(filter_id)
+        self.parameters.fetch(
+            self.fews_api._get_parameters(filterId=filter_id))
 
     def update_locations_select(self, location_names):
         """Update datamodel on selected locations."""
@@ -103,10 +101,12 @@ class Data(object):
             headers = self.fews_api.get_headers(
                 filterId=self.filters.selected['id'],
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                parameterIds=self.parameters.df.index.to_list(),
                 locationIds=location_ids)
-
-            self.timeseries.headers = headers
-            self.parameters.update(list(set([item['parameterId'] for item in headers])))
+            if headers is not None:
+                self.timeseries.headers = headers
+                self.parameters.update(
+                    list(set([item['parameterId'] for item in headers])))
 
     def update_parameters_select(self, parameter_names):
         """Update datamodel on selected locations."""
@@ -201,9 +201,9 @@ class Data(object):
                                              data={'x': [], 'y': []}
                                              )
 
-            self.update(filterId)
+            self.fetch(filterId)
 
-        def update(self, filterId):
+        def fetch(self, filterId):
             """Update locations by filterId."""
             gdf = self.fews_api.get_locations(filterId=filterId)
             self.bounds = gdf["geometry"].buffer(MAP_BUFFER).total_bounds
@@ -222,22 +222,23 @@ class Data(object):
             df.loc[
                 df["locationId"].str.match("[A-Z]{3}-[A-Z]{3}-[A-Z]{3}"), "type"
             ] = "neerslag"
-            df.reset_index(drop=True, inplace=True)
 
-            self.df = df
+            self.df = df.sort_values("shortName")
+            self.df.reset_index(drop=True, inplace=True)
 
-            self.names = df['shortName'].to_list()
-            self.ids = df['locationId'].to_list()
+            self.names = self.df['shortName'].to_list()
+            self.ids = self.df['locationId'].to_list()
 
             self.pluvial.data.update(ColumnDataSource("x",
                                                       "y",
-                                                      data=df.loc[df["type"]
-                                                                  == "neerslag"]
+                                                      data=self.df.loc[self.df["type"]
+                                                                       == "neerslag"]
                                                       ).data)
 
             self.other.data.update(ColumnDataSource("x",
                                                     "y",
-                                                    data=df.loc[df["type"] == "overig"]
+                                                    data=self.df.loc[self.df["type"]
+                                                                     == "overig"]
                                                     ).data)
 
         def _update_selected(self, location_ids):
@@ -269,19 +270,26 @@ class Data(object):
             self.logger = logger
             self.groups = None
             self.ids = None
+            self.df = None
             self.names = None
             self.search_parameter = None
-            self.timesteps = dict()
-            self.qualifiers = dict()
             self.exclude = exclude
-            self.update(fews_api._get_parameters(filterId).index.to_list())
+            self.fetch(fews_api._get_parameters(filterId))
 
-        def update(self, locationIds):
-            """Update locations by filterId."""
-            self.ids = [par for par in locationIds if par not in self.exclude]
-            self.names = self.fews_api.to_parameter_names(self.ids)
-            self.groups = self.fews_api.parameters.loc[
-                self.ids]["parameterGroup"].to_list()
+        def fetch(self, df):
+            """Fetch new parameters filterId."""
+            self.df = df.loc[~df.index.isin(self.exclude)].sort_values("name")
+            self.ids = self.df.index.to_list()
+            self.names = self.df['name'].to_list()
+            self.groups = self.df['parameterGroup'].to_list()
+
+        def update(self, parameter_ids):
+            """Update ids and names selected."""
+            parameter_ids = [par for par in parameter_ids if par not in self.exclude]
+            df = self.df.loc[parameter_ids].sort_values("name")
+            self.ids = df.index.to_list()
+            self.names = df["name"].to_list()
+            self.groups = df["parameterGroup"].to_list()
 
     class TimeSeries(object):
         """TimeSeries data."""
@@ -356,8 +364,6 @@ class Data(object):
                    filter_id,
                    parameter_groups):
             """Update timeseries data."""
-            # create low resolution glyph
-            #print(location_ids, parameter_ids, search_parameter_id, qualifier_ids, timesteps, filter_id, parameter_groups)
             timespan = (self.end_datetime - self.search_start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
             colors = cycle(palette)
