@@ -191,8 +191,6 @@ def _create_timefig():
                                             lr_fig.y_range.end,
                                             lr_fig.y_range.start]}
                                      )
-        search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
-        search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
 
         lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
 
@@ -212,12 +210,21 @@ def _create_timefig():
                                             width=int(width * 0.75) - 80)
 
         date_range_slider.format = '%d-%m-%Y'
-
         date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
         date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
         date_range_slider.on_change("value", _update_on_date_range)
-        hr_x_range.x_range.js_link('start', date_range_slider, 'start')
-        hr_x_range.x_range.js_link('end', date_range_slider, 'end')
+
+        search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
+        search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
+        search_period_slider.js_link('value',
+                                     date_range_slider,
+                                     'start',
+                                     attr_selector=0)
+
+        search_period_slider.js_link('value',
+                                     date_range_slider,
+                                     'end',
+                                     attr_selector=1)
 
         tabs.tabs.append(Panel(child=column(*top_figs,
                                             lr_fig,
