@@ -196,6 +196,8 @@ def _create_timefig():
                                             end=search_period_slider.value[1],
                                             width=int(width * 0.75) - 65)
 
+        date_range_slider.format = '%d-%m-%Y'
+
         date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
         date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
 
@@ -395,6 +397,8 @@ search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
                                        start=data.first_value_datetime,
                                        end=data.end_datetime,
                                        title="Zoekperiode")
+
+search_period_slider.format = '%d-%m-%Y'
 
 search_parameter = Select(title="Zoekparameter:",
                           value=None,
