@@ -11,6 +11,7 @@ from config import (
 
 from fewsbokeh import map_figure, time_figure
 import logging
+from logging.handlers import RotatingFileHandler
 from bokeh.plotting import figure
 from bokeh import events
 from bokeh.io import curdoc
@@ -93,17 +94,15 @@ def _clean_filters():
 
     select_timesteps.value = timesteps_select
 
+
 def _create_timefig():
     if all([select_locations.value,
-       select_parameters.value,
-       select_timesteps.value]):
+       select_parameters.value]):
         search_parameter.options = select_parameters.value
         search_parameter.value = select_parameters.value[0]
         data.parameters.search_parameter = search_parameter.value
         data.create_timeseries(select_locations.value,
-                               select_parameters.value,
-                               select_qualifiers.value,
-                               select_timesteps.value)
+                               select_parameters.value)
         logger.debug("event: _create_time_fig")
         _remove_timefig()
 
@@ -207,12 +206,6 @@ def _create_timefig():
                                title="grafiek",
                                name="grafiek"))
 
-        # tabs.tabs.append(Panel(child=column(top_figs[0]),
-        #                        title="grafiek",
-        #                        name="grafiek"))
-    
-        #_activate_timefig()
-
 
 def update_on_double_tap(event):
     """Reset selected locarions on double tab."""
@@ -304,6 +297,7 @@ log_dir.mkdir(exist_ok=True)
 logFormatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL))
+fh = RotatingFileHandler(LOG_FILE, maxBytes=1024 * 10, backupCount=1)
 fh = logging.FileHandler(LOG_FILE)
 fh.setFormatter(logFormatter)
 logger.addHandler(fh)
@@ -411,44 +405,14 @@ search_parameter = Select(title="Zoekparameter:",
 map_panel = Panel(child=map_fig, title="kaart", name="kaart")
 tabs = Tabs(tabs=[map_panel])
 
-div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling! (laatste update: 22-01-2021)<b></p>""", height=int(height * 0.05))
+div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
+          (laatste update: 22-01-2021)<b></p>""", height=int(height * 0.05))
 
-layout = column(div,row(column(select_filter,
-                           select_locations,
-                           select_parameters,
-                           select_qualifiers,
-                    select_timesteps,
-                    search_period_slider,
-                    search_parameter), tabs))
+layout = column(div, row(column(select_filter,
+                                select_locations,
+                                select_parameters,
+                                search_period_slider,
+                                search_parameter), tabs))
 
 curdoc().add_root(layout)
 curdoc().title = TITLE
-
-
-"""
-location_ids, parameter_ids, search_parameter_id, qualifier_ids, timesteps, filter_id, parameter_groups = [['1110'],
-                                                                                        ['P.radar.cal'],
-                                                                                        'P.radar.cal',
-                                                                                        [],
-                                                                                        [['300', 'second']],
-                                                                                        'Hydronet_Keten',
-                                                                                        ['Radar Neerslag']]
-
-data.timeseries.update(
-                   location_ids,
-                   parameter_ids,
-                   search_parameter_id,
-                   qualifier_ids,
-                   timesteps,
-                   filter_id,
-                   parameter_groups)
-
-# add search graph
-glyphs = list(data.timeseries.hr_glyphs.values())[0]
-time_fig = figure()
-
-for glyph in glyphs:
-    time_fig.line(x="datetime", y="value", source=glyph['source'])
-
-curdoc().add_root(time_fig)
-"""

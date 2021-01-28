@@ -132,7 +132,7 @@ class Data(object):
         self.end_datetime = self.end_datetime + offset_sign * pd.DateOffset(
             years=abs(offset_years))
 
-    def create_timeseries(self, location_names, parameter_names, qualifiers, timesteps):
+    def create_timeseries(self, location_names, parameter_names):
         """Update timeseries."""
 #        print(location_names, parameter_names, qualifiers, timesteps)
         self.logger.debug("bokeh: _update_time_fig")
@@ -144,8 +144,6 @@ class Data(object):
         location_ids = self.locations._to_ids(location_names)
         location_ids = self.include_child_locations(location_ids)
         parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-        qualifiers = [item.split(" ") for item in qualifiers]
-        timesteps = [item.split(" ") for item in timesteps]
 
         parameter_groups = self.fews_api.parameters.loc[
             parameter_ids]["parameterGroup"].to_list()
@@ -156,8 +154,6 @@ class Data(object):
         self.timeseries.create(location_ids,
                                parameter_ids,
                                search_parameter_id,
-                               qualifiers,
-                               timesteps,
                                self.filters.selected['id'],
                                parameter_groups)
 
@@ -357,15 +353,11 @@ class Data(object):
                    location_ids,
                    parameter_ids,
                    search_parameter_id,
-                   qualifier_ids,
-                   timesteps,
                    filter_id,
                    parameter_groups):
             """Update timeseries data."""
             # create low resolution glyph
             #print(location_ids, parameter_ids, search_parameter_id, qualifier_ids, timesteps, filter_id, parameter_groups)
-            if not qualifier_ids:
-                qualifier_ids = " "
             timespan = (self.end_datetime - self.search_start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
             colors = cycle(palette)
@@ -373,7 +365,6 @@ class Data(object):
             _, self.lr_data = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
-                qualifierIds=qualifier_ids,
                 parameterIds=search_parameter_id,
                 startTime=self.search_start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -396,7 +387,6 @@ class Data(object):
             self.time_zone, self.hr_data = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
-                qualifierIds=qualifier_ids,
                 parameterIds=parameter_ids,
                 startTime=self.start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -415,28 +405,25 @@ class Data(object):
                 if "events" in ts.keys():
                     if not ts["events"].empty:
                         header = ts["header"]
-                        timestep = list(header["timeStep"].values())
-                        timestep.reverse()
-                        if timestep in timesteps:
-                            group = self.fews_api.parameters.loc[header["parameterId"]][
-                                "parameterGroup"]
-                            color = next(colors)
-                            short_name = self.fews_api.locations.loc[header[
-                                "locationId"]]["shortName"]
-                            parameter_name = self.fews_api.parameters.loc[header[
-                                "parameterId"]]["name"]
-                            self.hr_glyphs[group] += [
-                                {"type": "line",
-                                 "color": color,
-                                 "source": ColumnDataSource(ts["events"]),
-                                 "legend_label": f"{short_name} {parameter_name}"}
-                                                    ]
-                            x_bounds['start'] += [ts["events"]["datetime"].min()]
-                            x_bounds['end'] += [ts["events"]["datetime"].max()]
-                            self.hr_graphs[group]['y_bounds']['start'] += [
-                                ts["events"]["value"].min()]
-                            self.hr_graphs[group]['y_bounds']['end'] += [
-                                ts["events"]["value"].max()]
+                        group = self.fews_api.parameters.loc[header["parameterId"]][
+                            "parameterGroup"]
+                        color = next(colors)
+                        short_name = self.fews_api.locations.loc[header[
+                            "locationId"]]["shortName"]
+                        parameter_name = self.fews_api.parameters.loc[header[
+                            "parameterId"]]["name"]
+                        self.hr_glyphs[group] += [
+                            {"type": "line",
+                             "color": color,
+                             "source": ColumnDataSource(ts["events"]),
+                             "legend_label": f"{short_name} {parameter_name}"}
+                                                ]
+                        x_bounds['start'] += [ts["events"]["datetime"].min()]
+                        x_bounds['end'] += [ts["events"]["datetime"].max()]
+                        self.hr_graphs[group]['y_bounds']['start'] += [
+                            ts["events"]["value"].min()]
+                        self.hr_graphs[group]['y_bounds']['end'] += [
+                            ts["events"]["value"].max()]
 
             self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
                 int(float(self.time_zone)))

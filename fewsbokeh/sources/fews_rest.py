@@ -208,7 +208,7 @@ class Api:
         self.timer.reset()
         #print(parameters)
         response = requests.get(rest_url, parameters)
-        #print(response.url)
+        self.logger.debug(response.url)
         if response.status_code == 200:
             if onlyHeaders:
                 self.timer.report("Timeseries headers request")

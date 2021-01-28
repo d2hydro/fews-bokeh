@@ -15,3 +15,4 @@ projects/aa_en_maas/wik/locations.txt
 projects/aa_en_maas/wik/colors.py
 projects/aa_en_maas/wik/server_config.py
 projects/aa_en_maas/log/*
+projects/nzv/*
