@@ -366,6 +366,7 @@ class Data(object):
                 filterId=filter_id,
                 locationIds=location_ids,
                 parameterIds=search_parameter_id,
+                qualifierIds=[" "],
                 startTime=self.search_start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 thinning=thinner)
@@ -388,6 +389,7 @@ class Data(object):
                 filterId=filter_id,
                 locationIds=location_ids,
                 parameterIds=parameter_ids,
+                qualifierIds=[" "],
                 startTime=self.start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 thinning=thinner)

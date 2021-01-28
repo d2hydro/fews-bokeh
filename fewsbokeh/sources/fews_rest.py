@@ -51,6 +51,7 @@ class Api:
                           documentFormat=self.document_format)
         self.timer.reset()
         response = requests.get(rest_url, parameters)
+        print(response.url)
         self.timer.report("Parameters request")
         if response.status_code == 200:
             if "timeSeriesParameters" in response.json().keys():
@@ -60,7 +61,9 @@ class Api:
                 result = par_df
             else:
                 result = None
-        self.timer.report("Parameters parsed")
+            self.timer.report("Parameters parsed")
+        else:
+            self.logger.error(f"FEWS Server responds {response.text}")
         return result
 
     def get_filters(self, filterId=None):
