@@ -249,7 +249,7 @@ class Api:
                 self.timer.report("TimeSeries parsed")
             else:
                 self.logger.info("returning emtpy timeseries")
-                result = response.json()
+                result = None
         else:
             self.logger.error(
                 f"server responded with error ({response.status_code}): {response.text}"

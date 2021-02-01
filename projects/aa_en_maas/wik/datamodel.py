@@ -134,8 +134,6 @@ class Data(object):
 
     def create_timeseries(self, location_names, parameter_names):
         """Update timeseries."""
-#        print(location_names, parameter_names, qualifiers, timesteps)
-        self.logger.debug("bokeh: _update_time_fig")
 
         # some variables for later use
         self.timeseries.title = ",".join(location_names)
@@ -148,14 +146,72 @@ class Data(object):
         parameter_groups = self.fews_api.parameters.loc[
             parameter_ids]["parameterGroup"].to_list()
 
-        search_parameter_id = self.fews_api.to_parameter_ids(
-            [self.parameters.search_parameter])[0]
-
         self.timeseries.create(location_ids,
                                parameter_ids,
-                               search_parameter_id,
                                self.filters.selected['id'],
                                parameter_groups)
+
+    def update_lr_timeseries(self, search_series, start_datetime, end_datetime):
+        """Update lr timeseries."""
+        df = self.timeseries.timeseries
+        location_id = df.loc[df['label'] == search_series, 'location_id'].to_list()[0]
+        parameter_id = df.loc[df['label'] == search_series, 'parameter_id'].to_list()[0]
+        result = self.timeseries.get_lr_data(self.filters.selected['id'],
+                                             location_id,
+                                             parameter_id,
+                                             start_datetime=start_datetime,
+                                             end_datetime=end_datetime)
+
+        if result is not None:
+            ts = next((ts for ts in result[1] if not ts['events'].empty), None)
+
+        if ts is not None:
+            self.timeseries.lr_data = ts["events"]
+
+        self.timeseries.lr_glyph['source'].data.update(ColumnDataSource(
+            self.timeseries.lr_data).data)
+
+    def update_hr_timeseries(self, start_datetime, end_datetime):
+        """Update hr timeseries."""
+        print("hr update")
+        df = self.timeseries.timeseries
+        location_ids = list(df['location_id'].unique())
+        parameter_ids = list(df['parameter_id'].unique())
+
+        timespan = (end_datetime - start_datetime).days
+        thinner = int(timespan * 86400 * 1000 / width)
+        _, hr_data = self.fews_api.get_timeseries(
+            filterId=self.filters.selected['id'],
+            locationIds=location_ids,
+            parameterIds=parameter_ids,
+            qualifierIds=[" "],
+            startTime=start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            endTime=end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            thinning=thinner)
+
+        for ts in hr_data:
+            if "events" in ts.keys():
+                if not ts["events"].empty:
+                    header = ts["header"]
+                    parameter_id = header["parameterId"]
+                    location_id = header["locationId"]
+                    df.loc[(location_id, parameter_id), "source"].data.update(
+                        ColumnDataSource(ts["events"]).data)
+
+    def get_search_timeseries(self):
+        """Update options and values for search timeseries."""
+        options = [f"{ts['location_name']} ,[{ts['parameter_name']}]"
+                   for ts in self.timeseries.search_timeseries]
+
+        parameter_value = self.fews_api.to_parameter_names([
+            self.timeseries.search_value['parameter']])[0]
+
+        location_value = self.locations.df.loc[
+            self.locations.df['locationId'] == self.timeseries.search_value[
+                'location']]['shortName'].to_list()[0]
+
+        value = f"{location_value} ,[{parameter_value}]"
+        return options, value
 
     class Filters(object):
         """Available filters."""
@@ -310,7 +366,8 @@ class Data(object):
             self.search_start_datetime = search_start_datetime
             self.first_value_datetime = first_value_datetime
             self.time_zone = None
-            self.time_series = None
+            self.timeseries = None
+            self.search_value = None
             self.headers = None
             self.title = None
             self.hr_graphs = None
@@ -318,79 +375,42 @@ class Data(object):
             self.hr_glyphs = None
             self.lr_glyph = None
 
-        def timestep_names(self, parameter_names=None):
-            """Extract timestep names from timesteps."""
-            headers = self.headers
-            if parameter_names:
-                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-                headers = [item for item in headers
-                           if item['parameterId'] in parameter_ids]
+        def get_lr_data(self,
+                        filter_id,
+                        location_id,
+                        parameter_id,
+                        start_datetime=None,
+                        end_datetime=None):
+            """Get the low resolution data in a pandas dataframe."""
+            if start_datetime is not None:
+                self.search_start_datetime = start_datetime
+            if end_datetime is not None:
+                self.end_datetime = end_datetime
 
-            names = []
-            for header in headers:
-                name = ""
-                timestep = header['timeStep']
-                if "multiplier" in timestep.keys():
-                    name += f"{timestep['multiplier']} "
-                name += timestep["unit"]
-
-            names += [name]
-            names = list(set(names))
-            names.sort()
-            return names
-
-        def qualifier_names(self, parameter_names=None):
-            """Extract qualifier names from qualifiers."""
-            headers = self.headers
-            if parameter_names:
-                parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-                headers = [item for item in headers
-                           if item['parameterId'] in parameter_ids]
-
-            names = []
-            for item in headers:
-                if 'qualifierId' in item.keys():
-                    names += [" ".join(item['qualifierId'])]
-                else:
-                    names += [" "]
-            names = list(set(names))
-            names.sort()
-            return names
-
-        def create(self,
-                   location_ids,
-                   parameter_ids,
-                   search_parameter_id,
-                   filter_id,
-                   parameter_groups):
-            """Update timeseries data."""
             timespan = (self.end_datetime - self.search_start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
-            colors = cycle(palette)
 
-            _, self.lr_data = self.fews_api.get_timeseries(
+            result = self.fews_api.get_timeseries(
                 filterId=filter_id,
-                locationIds=location_ids,
-                parameterIds=search_parameter_id,
+                locationIds=[location_id],
+                parameterIds=[parameter_id],
                 qualifierIds=[" "],
                 startTime=self.search_start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 thinning=thinner)
-            # print(self.lr_data)
-            # get the first timeseries with data, otherwise return empty
-            df = next((ts['events'] for ts in self.lr_data if not ts[
-                'events'].empty), {"datetime": [], "value": []})
 
-            self.lr_glyph = {"type": "line",
-                             "color": next(colors),
-                             "source": ColumnDataSource(df)}
+            return result
 
-            # create high resolution glyphs
-            # get all timeseries from api
+        def create(self,
+                   location_ids,
+                   parameter_ids,
+                   filter_id,
+                   parameter_groups):
+            # print(location_ids, parameter_ids, filter_id, parameter_groups)
+            """Update timeseries data."""
+            # high resolution data
             timespan = (self.end_datetime - self.start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
-
-            # download data
             self.time_zone, self.hr_data = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
@@ -407,6 +427,7 @@ class Data(object):
                 "y_bounds": {'start': [], 'end': []}}
                               for group in parameter_groups}
 
+            timeseries = []
             colors = cycle(palette)
             x_bounds = {'start': [], 'end': []}
             for ts in self.hr_data:
@@ -420,10 +441,18 @@ class Data(object):
                             "locationId"]]["shortName"]
                         parameter_name = self.fews_api.parameters.loc[header[
                             "parameterId"]]["name"]
+                        source = ColumnDataSource(ts["events"])
+                        timeseries += [
+                            {"location_id": header["locationId"],
+                             "location_name": short_name,
+                             "parameter_id": header["parameterId"],
+                             "parameter_name": parameter_name,
+                             "parameter_group": group,
+                             "source": source}]
                         self.hr_glyphs[group] += [
                             {"type": "line",
                              "color": color,
-                             "source": ColumnDataSource(ts["events"]),
+                             "source": source,
                              "legend_label": f"{short_name} {parameter_name}"}
                                                 ]
                         x_bounds['start'] += [ts["events"]["datetime"].min()]
@@ -433,6 +462,13 @@ class Data(object):
                         self.hr_graphs[group]['y_bounds']['end'] += [
                             ts["events"]["value"].max()]
 
+            self.timeseries = pd.DataFrame(timeseries)
+            self.timeseries["label"] = self.timeseries.apply(
+                (lambda x: f"{x['location_name']} ({x['parameter_name']})"),
+                axis=1)
+            self.timeseries.set_index(["location_id", "parameter_id"],
+                                      inplace=True,
+                                      drop=False)
             self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
                 int(float(self.time_zone)))
 
@@ -463,3 +499,25 @@ class Data(object):
                         'end'] == self.hr_graphs[group]['y_bounds']['start']:
                     self.hr_graphs[group]['y_bounds']['end'] += 0.1
                     self.hr_graphs[group]['y_bounds']['start'] -= 0.1
+
+            # low resolution data
+            location_id = self.timeseries.iloc[0]['location_id']
+            parameter_id = self.timeseries.iloc[0]['parameter_id']
+
+            result = self.get_lr_data(filter_id,
+                                      location_id,
+                                      parameter_id)
+
+            if result is not None:
+                ts = next(
+                    (ts for ts in result[1] if not ts[
+                        'events'].empty), None)
+            if ts is not None:
+                self.lr_data = ts["events"]
+                self.search_value = {"parameter": ts["header"]["parameterId"],
+                                     "location": ts["header"]["locationId"]}
+
+            colors = cycle(palette)
+            self.lr_glyph = {"type": "line",
+                             "color": next(colors),
+                             "source": ColumnDataSource(self.lr_data)}
