@@ -399,11 +399,12 @@ tabs = Tabs(tabs=[map_panel])
 div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
           (laatste update: 02-02-2021)<b></p>""", height=int(height * 0.05))
 
-layout = column(div, row(column(select_filter,
-                                select_locations,
-                                select_parameters,
-                                search_period_slider,
-                                select_search_timeseries), tabs))
+layout = row(column(div,
+                    select_filter,
+                    select_locations,
+                    select_parameters,
+                    search_period_slider,
+                    select_search_timeseries), tabs)
 
 
 curdoc().add_root(layout)
