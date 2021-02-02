@@ -24,8 +24,8 @@ def generate(width,
              bound_limits=None,
              glyphs=None):
     """Generate a time-figure from supplied bokeh input parameters."""
-    time_hover = HoverTool(tooltips=[("datetime", "@datetime{%F}"),
-                                     ("value", "@value")],
+    time_hover = HoverTool(tooltips=[("datum-tijd", "@datetime{%F}"),
+                                     ("waarde", "@value{(0.00)}")],
                            formatters={"@datetime": "datetime"})
 
     tools = ["pan", "box_zoom", "xwheel_zoom", "reset", time_hover, "save"]
@@ -51,11 +51,11 @@ def generate(width,
     time_fig.toolbar.autohide = False
     time_fig.title.align = "center"
 
-    time_fig.xaxis.formatter=DatetimeTickFormatter(hours=["%H:%M:%S"],
-                                                   days=["%Y-%m-%d"],
-                                                   months=["%Y-%m-%d"],
-                                                   years=["%Y-%m-%d"],
-                                                   )
+    time_fig.xaxis.formatter = DatetimeTickFormatter(hours=["%H:%M"],
+                                                     days=["%d-%m-%Y"],
+                                                     months=["%d-%m-%Y"],
+                                                     years=["%d-%m-%Y"],
+                                                     )
     time_fig.xaxis.visible = x_axis_visible
 
     if glyphs:

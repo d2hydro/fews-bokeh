@@ -14,7 +14,8 @@ from itertools import cycle
 import pandas as pd
 import geopandas as gpd
 import numpy as np
-from bokeh.models import ColumnDataSource
+import math
+from bokeh.models import ColumnDataSource, Range1d
 from fewsbokeh.sources import fews_rest
 from fewsbokeh.time import Timer
 from shapely.geometry import Point
@@ -43,12 +44,11 @@ class Data(object):
         self.logger = logger
         self.timer = Timer(logger)
         self.now = NOW
-        self.end_datetime = self.now
-        self.start_datetime = self.end_datetime - pd.DateOffset(
+        self.start_datetime = self.now - pd.DateOffset(
             days=TIMESERIES_DAYS)
-        self.first_value_datetime = self.end_datetime - pd.DateOffset(
+        self.first_value_datetime = self.now - pd.DateOffset(
             years=SEARCH_YEARS)
-        self.search_start_datetime = self.end_datetime - pd.DateOffset(
+        self.search_start_datetime = self.now - pd.DateOffset(
             months=FILTER_MONTHS)
         self.fews_api = fews_rest.Api(URL, logger, filterId)
         self.timer.report("FEWS-API initiated")
@@ -68,10 +68,9 @@ class Data(object):
         self.timer.report("parameters initiated")
         self.timeseries = self.TimeSeries(self.fews_api,
                                           logger,
-                                          self.end_datetime,
+                                          self.now,
                                           self.start_datetime,
-                                          self.search_start_datetime,
-                                          self.first_value_datetime)
+                                          self.search_start_datetime)
         self.timer.reset("init finished")
 
     def include_child_locations(self, location_ids):
@@ -100,7 +99,7 @@ class Data(object):
             location_ids = self.include_child_locations(location_ids)
             headers = self.fews_api.get_headers(
                 filterId=self.filters.selected['id'],
-                endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                endTime=self.now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 parameterIds=self.parameters.df.index.to_list(),
                 locationIds=location_ids)
             if headers is not None:
@@ -123,15 +122,6 @@ class Data(object):
 
         self.locations._update_selected(location_ids)
 
-    def update_search_dates(self, offset_years):
-        """Update datamodel when offsets search-period."""
-        offset_sign = np.sign(offset_years)
-        self.first_value_datetime = self.first_value_datetime + offset_sign * pd.DateOffset(
-            years=abs(offset_years))
-
-        self.end_datetime = self.end_datetime + offset_sign * pd.DateOffset(
-            years=abs(offset_years))
-
     def create_timeseries(self, location_names, parameter_names):
         """Update timeseries."""
 
@@ -153,6 +143,11 @@ class Data(object):
 
     def update_lr_timeseries(self, search_series, start_datetime, end_datetime):
         """Update lr timeseries."""
+        self.timeseries.search_start_datetime = start_datetime
+        self.timeseries.search_end_datetime = end_datetime
+        # self.timeseries.end_datetime = end_datetime
+        # self.timeseries.start_datetime = end_datetime - pd.DateOffset(
+        #     days=TIMESERIES_DAYS)
         df = self.timeseries.timeseries
         location_id = df.loc[df['label'] == search_series, 'location_id'].to_list()[0]
         parameter_id = df.loc[df['label'] == search_series, 'parameter_id'].to_list()[0]
@@ -168,16 +163,23 @@ class Data(object):
         if ts is not None:
             self.timeseries.lr_data = ts["events"]
 
-        self.timeseries.lr_glyph['source'].data.update(ColumnDataSource(
-            self.timeseries.lr_data).data)
+        source = ColumnDataSource(self.timeseries.lr_data)
+        self.timeseries.lr_glyph['source'].data.update(source.data)
+
+        y_start = math.floor(min(source.data["value"]) * 10) / 10
+        y_end = math.ceil(max(source.data["value"]) * 10) / 10
+        self.timeseries.lr_y_range.start = y_start
+        self.timeseries.lr_y_range.end = y_end
+        # print(y_start, y_end)
 
     def update_hr_timeseries(self, start_datetime, end_datetime):
         """Update hr timeseries."""
-        print("hr update")
         df = self.timeseries.timeseries
         location_ids = list(df['location_id'].unique())
         parameter_ids = list(df['parameter_id'].unique())
 
+        self.timeseries.start_datetime = start_datetime
+        self.timeseries.end_datetime = end_datetime
         timespan = (end_datetime - start_datetime).days
         thinner = int(timespan * 86400 * 1000 / width)
         _, hr_data = self.fews_api.get_timeseries(
@@ -189,6 +191,7 @@ class Data(object):
             endTime=end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
             thinning=thinner)
 
+        # update data sources
         for ts in hr_data:
             if "events" in ts.keys():
                 if not ts["events"].empty:
@@ -197,6 +200,17 @@ class Data(object):
                     location_id = header["locationId"]
                     df.loc[(location_id, parameter_id), "source"].data.update(
                         ColumnDataSource(ts["events"]).data)
+
+        # update graph y-ranges
+        for key, value in self.timeseries.hr_graphs.items():
+            y_range = value["y_range"]
+            glyphs = self.timeseries.hr_glyphs[key]
+            y_end = max([glyph["source"].data["value"].max() for glyph in glyphs])
+            y_start = min([glyph["source"].data["value"].min() for glyph in glyphs])
+            y_range.end = y_end
+            y_range.start = y_start
+            y_range.reset_end = y_end
+            y_range.reset_start = y_start
 
     def get_search_timeseries(self):
         """Update options and values for search timeseries."""
@@ -353,18 +367,17 @@ class Data(object):
         def __init__(self,
                      fews_api,
                      logger,
-                     end_datetime,
+                     now,
                      start_datetime,
-                     search_start_datetime,
-                     first_value_datetime):
+                     search_start_datetime):
             self.hr_data = None
             self.lr_data = None
             self.fews_api = fews_api
             self.logger = logger
             self.start_datetime = start_datetime
-            self.end_datetime = end_datetime
+            self.end_datetime = now
+            self.search_end_datetime = now
             self.search_start_datetime = search_start_datetime
-            self.first_value_datetime = first_value_datetime
             self.time_zone = None
             self.timeseries = None
             self.search_value = None
@@ -372,6 +385,7 @@ class Data(object):
             self.title = None
             self.hr_graphs = None
             self.x_bounds = None
+            self.lr_y_range = Range1d(start=-0.1, end=0.1, bounds=None)
             self.hr_glyphs = None
             self.lr_glyph = None
 
@@ -385,9 +399,9 @@ class Data(object):
             if start_datetime is not None:
                 self.search_start_datetime = start_datetime
             if end_datetime is not None:
-                self.end_datetime = end_datetime
+                self.search_end_datetime = end_datetime
 
-            timespan = (self.end_datetime - self.search_start_datetime).days
+            timespan = (self.search_end_datetime - self.search_start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
 
             result = self.fews_api.get_timeseries(
@@ -396,7 +410,7 @@ class Data(object):
                 parameterIds=[parameter_id],
                 qualifierIds=[" "],
                 startTime=self.search_start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                endTime=self.end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                endTime=self.search_end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 thinning=thinner)
 
             return result
@@ -429,7 +443,7 @@ class Data(object):
 
             timeseries = []
             colors = cycle(palette)
-            x_bounds = {'start': [], 'end': []}
+            # x_bounds = {'start': [], 'end': []}
             for ts in self.hr_data:
                 if "events" in ts.keys():
                     if not ts["events"].empty:
@@ -455,8 +469,8 @@ class Data(object):
                              "source": source,
                              "legend_label": f"{short_name} {parameter_name}"}
                                                 ]
-                        x_bounds['start'] += [ts["events"]["datetime"].min()]
-                        x_bounds['end'] += [ts["events"]["datetime"].max()]
+                        # x_bounds['start'] += [ts["events"]["datetime"].min()]
+                        # x_bounds['end'] += [ts["events"]["datetime"].max()]
                         self.hr_graphs[group]['y_bounds']['start'] += [
                             ts["events"]["value"].min()]
                         self.hr_graphs[group]['y_bounds']['end'] += [
@@ -472,17 +486,17 @@ class Data(object):
             self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
                 int(float(self.time_zone)))
 
-            if len(x_bounds['start']) > 0:
-                x_bounds['start'] = min(x_bounds['start'])
-            else:
-                x_bounds['start'] = self.start_datetime
+            # if len(x_bounds['start']) > 0:
+            #     x_bounds['start'] = min(x_bounds['start'])
+            # else:
+            #     x_bounds['start'] = self.start_datetime
 
-            if len(x_bounds['end']) > 0:
-                x_bounds['end'] = max(x_bounds['end'])
-            else:
-                x_bounds['end'] = self.end_datetime
+            # if len(x_bounds['end']) > 0:
+            #     x_bounds['end'] = max(x_bounds['end'])
+            # else:
+            #     x_bounds['end'] = self.end_datetime
 
-            self.x_bounds = x_bounds
+            # self.x_bounds = x_bounds
             for group in self.hr_glyphs.keys():
                 if len(self.hr_graphs[group]['y_bounds']['start']) > 0:
                     self.hr_graphs[group]['y_bounds']['start'] = min(
@@ -499,6 +513,10 @@ class Data(object):
                         'end'] == self.hr_graphs[group]['y_bounds']['start']:
                     self.hr_graphs[group]['y_bounds']['end'] += 0.1
                     self.hr_graphs[group]['y_bounds']['start'] -= 0.1
+                self.hr_graphs[group]['y_range'] = Range1d(
+                    start=self.hr_graphs[group]['y_bounds']['start'],
+                    end=self.hr_graphs[group]['y_bounds']['end'],
+                    bounds=None)
 
             # low resolution data
             location_id = self.timeseries.iloc[0]['location_id']
@@ -517,7 +535,13 @@ class Data(object):
                 self.search_value = {"parameter": ts["header"]["parameterId"],
                                      "location": ts["header"]["locationId"]}
 
+            source = ColumnDataSource(self.lr_data)
             colors = cycle(palette)
             self.lr_glyph = {"type": "line",
                              "color": next(colors),
-                             "source": ColumnDataSource(self.lr_data)}
+                             "source": source}
+            y_start = math.floor(min(source.data["value"]) * 10) / 10
+            y_end = math.ceil(max(source.data["value"]) * 10) / 10
+            self.lr_y_range.start = y_start
+            self.lr_y_range.end = y_end
+            # print(y_start, y_end)

@@ -98,6 +98,8 @@ def _create_timefig():
         """Update triggered by date_range_sider throttled."""
         start_datetime, end_datetime = date_range_slider.value_as_datetime
         data.update_hr_timeseries(start_datetime, end_datetime)
+        hr_x_range.reset_start = start_datetime
+        hr_x_range.reset_end = end_datetime
 
     if all([select_locations.value,
        select_parameters.value]):
@@ -117,8 +119,8 @@ def _create_timefig():
         top_figs = []
         glyphs = data.timeseries.hr_glyphs
         fig_height = int(height * 0.75 * 0.85 / len(glyphs))
-        hr_x_range = Range1d(start=data.timeseries.x_bounds['start'],
-                             end=data.timeseries.x_bounds['end'],
+        hr_x_range = Range1d(start=data.timeseries.start_datetime,
+                             end=data.timeseries.end_datetime,
                              bounds="auto")
         for idx, (key, values) in enumerate(glyphs.items()):
             if idx == 0:
@@ -148,13 +150,13 @@ def _create_timefig():
                                               y_axis_label=y_axis_label,
                                               x_axis_visible=x_axis_visible,
                                               x_range=hr_x_range,
-                                              y_bounds=graph['y_bounds'],
+                                              y_range=graph['y_range'],
                                               glyphs=values,
                                               )]
         # define search fig
         glyph = data.timeseries.lr_glyph
-        x_bounds = {"start": search_period_slider.value[0],
-                    "end": search_period_slider.value[1]}
+        x_bounds = {"start": data.timeseries.search_start_datetime,
+                    "end": data.timeseries.search_end_datetime}
 
         y_bounds = {"start": 0, "end": 1}
         if len(glyph['source'].data['value']) > 0:
@@ -170,14 +172,13 @@ def _create_timefig():
                                       y_axis_label="",
                                       x_axis_visible=True,
                                       x_range=lr_x_range,
-                                      y_bounds=y_bounds,
+                                      y_range=data.timeseries.lr_y_range,
                                       show_toolbar=False,
                                       glyphs=[glyph])
-
-        patch_src = ColumnDataSource({'x': [data.timeseries.x_bounds["start"],
-                                            data.timeseries.x_bounds["start"],
-                                            data.timeseries.x_bounds["end"],
-                                            data.timeseries.x_bounds["end"]],
+        patch_src = ColumnDataSource({'x': [data.timeseries.start_datetime,
+                                            data.timeseries.start_datetime,
+                                            data.timeseries.end_datetime,
+                                            data.timeseries.end_datetime],
                                       'y': [lr_fig.y_range.start,
                                             lr_fig.y_range.end,
                                             lr_fig.y_range.end,
@@ -192,13 +193,10 @@ def _create_timefig():
         lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
 
         # define daterange slider
-        end_datetime = pd.Timestamp(search_period_slider.value[1]*1000000)
-        start_datetime = end_datetime - pd.DateOffset(days=7)
-
-        date_range_slider = DateRangeSlider(value=(start_datetime,
-                                                   end_datetime),
-                                            start=search_period_slider.value[0],
-                                            end=search_period_slider.value[1],
+        date_range_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
+                                                   data.timeseries.end_datetime),
+                                            start=data.timeseries.search_start_datetime,
+                                            end=data.timeseries.search_end_datetime,
                                             width=int(width * 0.75) - 80)
 
         date_range_slider.format = '%d-%m-%Y'
@@ -381,9 +379,9 @@ select_parameters.on_change("value", update_on_parameters_select)
 
 # %% define search period selection
 search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
-                                              data.end_datetime),
+                                              data.now),
                                        start=data.first_value_datetime,
-                                       end=data.end_datetime,
+                                       end=data.now,
                                        title="Zoekperiode")
 
 search_period_slider.format = '%d-%m-%Y'
@@ -399,7 +397,7 @@ map_panel = Panel(child=map_fig, title="kaart", name="kaart")
 tabs = Tabs(tabs=[map_panel])
 
 div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
-          (laatste update: 28-01-2021)<b></p>""", height=int(height * 0.05))
+          (laatste update: 02-02-2021)<b></p>""", height=int(height * 0.05))
 
 layout = column(div, row(column(select_filter,
                                 select_locations,
@@ -410,101 +408,3 @@ layout = column(div, row(column(select_filter,
 
 curdoc().add_root(layout)
 curdoc().title = TITLE
-
-# location_ids, parameter_ids, filter_id, parameter_groups = [
-#     ['4120'], ['Q.meting.m3uur'], 'Hydronet_Keten', ['Debiet m3 per uur']]
-
-# data.timeseries.create(location_ids, parameter_ids, filter_id, parameter_groups)
-
-# search_parameters = data.get_search_timeseries()
-# select_search_timeseries.options = search_parameters[0]
-# select_search_timeseries.value = search_parameters[1]
-
-# # difine top-figs
-# top_figs = []
-# glyphs = data.timeseries.hr_glyphs
-# fig_height = int(height * 0.75 * 0.85 / len(glyphs))
-# hr_x_range = Range1d(start=data.timeseries.x_bounds['start'],
-#                      end=data.timeseries.x_bounds['end'],
-#                      bounds="auto")
-# for idx, (key, values) in enumerate(glyphs.items()):
-#     if idx == 0:
-#         fig_title = ",".join(select_locations.value)
-#     else:
-#         fig_title = ""
-
-#     if idx == len(glyphs.items()) - 1:
-#         x_axis_visible = True
-#     else:
-#         x_axis_visible = False
-
-#     if len(select_parameters.value) == 1:
-#         y_axis_label = select_parameters.value[0]
-#     else:
-#         fews_parameters = data.fews_api.parameters
-#         unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
-#             "displayUnit"
-#         ].to_list()[0]
-#         y_axis_label = f"{key} [{unit}]"
-
-#     graph = data.timeseries.hr_graphs[key]
-#     top_figs += [time_figure.generate(title=fig_title,
-#                                       width=int(width * 0.75),
-#                                       height=fig_height,
-#                                       x_axis_label="",
-#                                       y_axis_label=y_axis_label,
-#                                       x_axis_visible=x_axis_visible,
-#                                       x_range=hr_x_range,
-#                                       y_bounds=graph['y_bounds'],
-#                                       glyphs=values,
-#                                       )]
-# # define search fig
-# glyph = data.timeseries.lr_glyph
-# x_bounds = {"start": search_period_slider.value[0],
-#             "end": search_period_slider.value[1]}
-
-# y_bounds = {"start": 0, "end": 1}
-# if len(glyph['source'].data['value']) > 0:
-#     y_bounds["start"] = glyph['source'].data['value'].min()
-#     y_bounds["end"] = glyph['source'].data['value'].max()
-
-# lr_x_range = Range1d(start=x_bounds['start'],
-#                      end=x_bounds['end'],
-#                      bounds="auto")
-# lr_fig = time_figure.generate(width=int(width * 0.75),
-#                               height=int(height * 0.15 * 0.75),
-#                               x_axis_label=data.timeseries.x_axis_label,
-#                               y_axis_label="",
-#                               x_axis_visible=True,
-#                               x_range=lr_x_range,
-#                               y_bounds=y_bounds,
-#                               show_toolbar=False,
-#                               glyphs=[glyph])
-
-# patch_src = ColumnDataSource({'x': [data.timeseries.x_bounds["start"],
-#                                     data.timeseries.x_bounds["start"],
-#                                     data.timeseries.x_bounds["end"],
-#                                     data.timeseries.x_bounds["end"]],
-#                               'y': [lr_fig.y_range.start,
-#                                     lr_fig.y_range.end,
-#                                     lr_fig.y_range.end,
-#                                     lr_fig.y_range.start]}
-#                              )
-
-# lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
-
-# lr_fig.toolbar_location = None
-# lr_fig.ygrid.visible = False
-# lr_fig.yaxis[0].ticker = [y_bounds['start'], y_bounds['end']]
-# lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
-
-# # define daterange slider
-# end_datetime = pd.Timestamp(search_period_slider.value[1]*1000000)
-# start_datetime = end_datetime - pd.DateOffset(days=7)
-
-# fig = figure()
-# source = ColumnDataSource(data={'datetime':[data.start_datetime, data.end_datetime],'value':[0,1]})
-# fig.line(x="datetime", y="value", source=source)
-
-# curdoc().add_root(fig)
-# curdoc().title = TITLE
