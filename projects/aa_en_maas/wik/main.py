@@ -298,6 +298,20 @@ def update_on_search_select(attrname, old, new):
                                   end_datetime)
 
 
+def update_on_search_period(attrname, old, new):
+    start_datetime = pd.Timestamp(new[0] * 1000000)
+    end_datetime = pd.Timestamp(new[1] * 1000000)
+    days = (end_datetime - start_datetime).days
+    if days > 150:
+        if old[0] != new[0]:
+            # starttime is shifting
+            search_period_slider.value = (
+                start_datetime, start_datetime + pd.Timedelta(days=150))
+        else:
+            search_period_slider.value = (
+                end_datetime - pd.Timedelta(days=150), start_datetime)
+
+
 log_dir = LOG_FILE.parent
 log_dir.mkdir(exist_ok=True)
 logFormatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
@@ -385,6 +399,7 @@ search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
                                        title="Zoekperiode")
 
 search_period_slider.format = '%d-%m-%Y'
+search_period_slider.on_change("value", update_on_search_period)
 search_period_slider.on_change("value_throttled", update_on_search_select)
 
 select_search_timeseries = Select(title="Zoektijdserie:", value=None, options=[])
