@@ -36,13 +36,14 @@ class Api:
     snake_case.
     """
 
-    def __init__(self, url, logger, filterId):
+    def __init__(self, url, logger, filterId, ssl_verify=False):
         self.document_format = "PI_JSON"
         self.url = url
         self.parameters = None
         self.locations = None
         self.logger = logger
         self.timer = Timer(logger)
+        self.ssl_verify = ssl_verify
         self._get_parameters(filterId)
 
     def _get_parameters(self, filterId):
@@ -50,7 +51,7 @@ class Api:
         parameters = dict(filterId=filterId,
                           documentFormat=self.document_format)
         self.timer.reset()
-        response = requests.get(rest_url, parameters)
+        response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         print(response.url)
         self.timer.report("Parameters request")
         if response.status_code == 200:
@@ -72,7 +73,7 @@ class Api:
 
         parameters = {"documentFormat": self.document_format, "filterId": filterId}
         self.timer.reset()
-        response = requests.get(rest_url, parameters)
+        response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         self.timer.report("Filters request")
         if response.status_code == 200:
             if "filters" in response.json().keys():
@@ -153,7 +154,7 @@ class Api:
             filterId=filterId,
         )
         self.timer.reset()
-        response = requests.get(rest_url, parameters)
+        response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         self.timer.report("Locations request")
         if response.status_code == 200:
             gdf = gpd.GeoDataFrame(response.json()["locations"])
@@ -212,7 +213,7 @@ class Api:
         parameters.update({"documentFormat": self.document_format})
         self.timer.reset()
         #print(parameters)
-        response = requests.get(rest_url, parameters)
+        response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         self.logger.debug(response.url)
         if response.status_code == 200:
             if onlyHeaders:

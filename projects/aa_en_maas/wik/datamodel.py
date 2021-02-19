@@ -1,5 +1,5 @@
 """Datamodel for Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from server_config import URL, NOW
+from server_config import URL, NOW, SSL_VERIFY
 
 from config import (
     MAP_BUFFER,
@@ -50,7 +50,7 @@ class Data(object):
             years=SEARCH_YEARS)
         self.search_start_datetime = self.now - pd.DateOffset(
             months=FILTER_MONTHS)
-        self.fews_api = fews_rest.Api(URL, logger, filterId)
+        self.fews_api = fews_rest.Api(URL, logger, filterId, SSL_VERIFY)
         self.timer.report("FEWS-API initiated")
         self.filters = self.Filters(filterId,
                                     self.fews_api,

@@ -330,6 +330,8 @@ data = Data(FILTER_SELECTED, logger)
 
 # %% detect server screen resolution
 width, height = _screen_resolution()
+width = width * 0.9
+height = height * 0.9
 
 # %% define map figure widget and handlers
 map_glyphs = [
