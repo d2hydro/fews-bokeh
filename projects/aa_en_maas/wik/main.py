@@ -1,5 +1,5 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from server_config import SERVER
+from server_config import SERVER, USE_JINJA_TEMPLATE
 
 from config import (
     TITLE,
@@ -23,7 +23,8 @@ from bokeh.models.widgets import (
     MultiSelect,
     RangeSlider,
     Slider,
-    DateRangeSlider
+    DateRangeSlider,
+    HTMLTemplateFormatter
 )
 from bokeh.models import ColumnDataSource, Range1d
 from bokeh.layouts import row, column, widgetbox
@@ -109,121 +110,126 @@ def _create_timefig():
         _remove_timefig()
 
         # update timeseries search select
-        search_options = data.timeseries.timeseries["label"].to_list()
-        search_options.sort()
-        search_value = data.timeseries.timeseries.iloc[0]["label"]
-        select_search_timeseries.options = search_options
-        select_search_timeseries.value = search_value
+        if not data.timeseries.timeseries.empty:
+            search_options = data.timeseries.timeseries["label"].to_list()
+            search_options.sort()
+            search_value = data.timeseries.timeseries.iloc[0]["label"]
+            select_search_timeseries.options = search_options
+            select_search_timeseries.value = search_value
 
-        # difine top-figs
-        top_figs = []
-        glyphs = data.timeseries.hr_glyphs
-        fig_height = int(height * 0.75 * 0.85 / len(glyphs))
-        hr_x_range = Range1d(start=data.timeseries.start_datetime,
-                             end=data.timeseries.end_datetime,
-                             bounds="auto")
-        for idx, (key, values) in enumerate(glyphs.items()):
-            if idx == 0:
-                fig_title = ",".join(select_locations.value)
-            else:
-                fig_title = ""
+            # difine top-figs
+            top_figs = []
+            glyphs = data.timeseries.hr_glyphs
+            fig_height = int(height * 0.75 * 0.85 / len(glyphs))
+            hr_x_range = Range1d(start=data.timeseries.start_datetime,
+                                 end=data.timeseries.end_datetime,
+                                 bounds="auto")
+            for idx, (key, values) in enumerate(glyphs.items()):
+                if idx == 0:
+                    fig_title = ",".join(select_locations.value)
+                else:
+                    fig_title = ""
 
-            if idx == len(glyphs.items()) - 1:
-                x_axis_visible = True
-            else:
-                x_axis_visible = False
+                if idx == len(glyphs.items()) - 1:
+                    x_axis_visible = True
+                else:
+                    x_axis_visible = False
 
-            if len(select_parameters.value) == 1:
-                y_axis_label = select_parameters.value[0]
-            else:
-                fews_parameters = data.fews_api.parameters
-                unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
-                    "displayUnit"
-                ].to_list()[0]
-                y_axis_label = f"{key} [{unit}]"
+                if len(select_parameters.value) == 1:
+                    y_axis_label = select_parameters.value[0]
+                else:
+                    fews_parameters = data.fews_api.parameters
+                    unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
+                        "displayUnit"
+                    ].to_list()[0]
+                    y_axis_label = f"{key} [{unit}]"
 
-            graph = data.timeseries.hr_graphs[key]
-            top_figs += [time_figure.generate(title=fig_title,
-                                              width=int(width * 0.75),
-                                              height=fig_height,
-                                              x_axis_label="",
-                                              y_axis_label=y_axis_label,
-                                              x_axis_visible=x_axis_visible,
-                                              x_range=hr_x_range,
-                                              y_range=graph['y_range'],
-                                              glyphs=values,
-                                              )]
-        # define search fig
-        glyph = data.timeseries.lr_glyph
-        x_bounds = {"start": data.timeseries.search_start_datetime,
-                    "end": data.timeseries.search_end_datetime}
+                graph = data.timeseries.hr_graphs[key]
+                top_figs += [time_figure.generate(title=fig_title,
+                                                  sizing_mode="stretch_both",
+                                                  x_axis_label="",
+                                                  y_axis_label=y_axis_label,
+                                                  x_axis_visible=x_axis_visible,
+                                                  x_range=hr_x_range,
+                                                  y_range=graph['y_range'],
+                                                  glyphs=values,
+                                                  )]
+            # define search fig
+            glyph = data.timeseries.lr_glyph
+            x_bounds = {"start": data.timeseries.search_start_datetime,
+                        "end": data.timeseries.search_end_datetime}
 
-        y_bounds = {"start": 0, "end": 1}
-        if len(glyph['source'].data['value']) > 0:
-            y_bounds["start"] = glyph['source'].data['value'].min()
-            y_bounds["end"] = glyph['source'].data['value'].max()
+            y_bounds = {"start": 0, "end": 1}
+            if len(glyph['source'].data['value']) > 0:
+                y_bounds["start"] = glyph['source'].data['value'].min()
+                y_bounds["end"] = glyph['source'].data['value'].max()
 
-        lr_x_range = Range1d(start=x_bounds['start'],
-                             end=x_bounds['end'],
-                             bounds="auto")
-        lr_fig = time_figure.generate(width=int(width * 0.75),
-                                      height=int(height * 0.15 * 0.75),
-                                      x_axis_label=data.timeseries.x_axis_label,
-                                      y_axis_label="",
-                                      x_axis_visible=True,
-                                      x_range=lr_x_range,
-                                      y_range=data.timeseries.lr_y_range,
-                                      show_toolbar=False,
-                                      glyphs=[glyph])
-        patch_src = ColumnDataSource({'x': [data.timeseries.start_datetime,
-                                            data.timeseries.start_datetime,
-                                            data.timeseries.end_datetime,
-                                            data.timeseries.end_datetime],
-                                      'y': [lr_fig.y_range.start,
-                                            lr_fig.y_range.end,
-                                            lr_fig.y_range.end,
-                                            lr_fig.y_range.start]}
-                                     )
+            lr_x_range = Range1d(start=x_bounds['start'],
+                                 end=x_bounds['end'],
+                                 bounds="auto")
+            lr_fig = time_figure.generate(sizing_mode="stretch_both",
+                                          x_axis_label=data.timeseries.x_axis_label,
+                                          y_axis_label="",
+                                          x_axis_visible=True,
+                                          x_range=lr_x_range,
+                                          y_range=data.timeseries.lr_y_range,
+                                          show_toolbar=False,
+                                          glyphs=[glyph])
+            patch_src = ColumnDataSource({'x': [data.timeseries.start_datetime,
+                                                data.timeseries.start_datetime,
+                                                data.timeseries.end_datetime,
+                                                data.timeseries.end_datetime],
+                                          'y': [lr_fig.y_range.start,
+                                                lr_fig.y_range.end,
+                                                lr_fig.y_range.end,
+                                                lr_fig.y_range.start]}
+                                         )
 
-        lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
+            lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
 
-        lr_fig.toolbar_location = None
-        lr_fig.ygrid.visible = False
-        lr_fig.yaxis[0].ticker = [y_bounds['start'], y_bounds['end']]
-        lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
+            lr_fig.toolbar_location = None
+            lr_fig.ygrid.visible = False
+            lr_fig.yaxis[0].ticker = [y_bounds['start'], y_bounds['end']]
+            lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
 
-        # define daterange slider
-        date_range_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
-                                                   data.timeseries.end_datetime),
-                                            start=data.timeseries.search_start_datetime,
-                                            end=data.timeseries.search_end_datetime,
-                                            width=int(width * 0.75) - 80)
+            # define daterange slider
+            date_range_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
+                                                       data.timeseries.end_datetime),
+                                                start=data.timeseries.search_start_datetime,
+                                                end=data.timeseries.search_end_datetime)
 
-        date_range_slider.format = '%d-%m-%Y'
-        date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
-        date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
-        date_range_slider.on_change("value", _update_on_date_range)
-        date_range_slider.on_change("value_throttled", _update_on_date_range_throttled)
+            date_range_slider.format = '%d-%m-%Y'
+            date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
+            date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
+            date_range_slider.on_change("value", _update_on_date_range)
+            date_range_slider.on_change("value_throttled", _update_on_date_range_throttled)
 
-        search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
-        search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
-        search_period_slider.js_link('value',
-                                     date_range_slider,
-                                     'start',
-                                     attr_selector=0)
+            search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
+            search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
+            search_period_slider.js_link('value',
+                                         date_range_slider,
+                                         'start',
+                                         attr_selector=0)
 
-        search_period_slider.js_link('value',
-                                     date_range_slider,
-                                     'end',
-                                     attr_selector=1)
+            search_period_slider.js_link('value',
+                                         date_range_slider,
+                                         'end',
+                                         attr_selector=1)
 
-        tabs.tabs.append(Panel(child=column(*top_figs,
-                                            lr_fig,
-                                            row(Div(width=40, text=""),
-                                                date_range_slider)),
-                               title="grafiek",
-                               name="grafiek"))
-
+        grafiek.children.pop()
+        grafiek_lr.children.pop()
+        grafiek_slider.children.pop()
+        
+#       grafiek.children.append(column(*top_figs,
+#                         lr_fig,
+#                         row(Div(width=40, text=""),
+#                                   date_range_slider, sizing_mode="stretch_both")))
+        grafiek.children.append(column(*top_figs, sizing_mode="stretch_both"))
+                 #        lr_fig,
+                #         row(Div(width=40, text=""),
+                 #                  date_range_slider, sizing_mode="stretch_both"))
+        grafiek_lr.children.append(column(lr_fig,sizing_mode="stretch_both"))
+        grafiek_slider.children.append(column(date_range_slider,sizing_mode="stretch_both"))
 
 def update_on_double_tap(event):
     """Reset selected locarions on double tab."""
@@ -330,8 +336,6 @@ data = Data(FILTER_SELECTED, logger)
 
 # %% detect server screen resolution
 width, height = _screen_resolution()
-width = width * 0.9
-height = height * 0.9
 
 # %% define map figure widget and handlers
 map_glyphs = [
@@ -360,12 +364,11 @@ map_glyphs = [
     ]
 
 map_fig = map_figure.generate(
-    width=int(width * 0.75),
-    height=int(height * 0.75),
     bounds=data.locations.bounds,
     glyphs=map_glyphs,
     )
 
+map_fig.name = "map_fig"
 map_fig.on_event(events.Tap, update_on_tap)
 map_fig.on_event(events.DoubleTap, update_on_double_tap)
 
@@ -389,7 +392,6 @@ select_parameters = MultiSelect(title="Parameters:",
                                 value=[],
                                 options=data.parameters.names)
 
-select_parameters.height = int(height * 0.13)
 
 select_parameters.on_change("value", update_on_parameters_select)
 
@@ -411,18 +413,43 @@ select_search_timeseries.on_change("value", update_on_search_select)
 # %% define layout
 
 map_panel = Panel(child=map_fig, title="kaart", name="kaart")
-tabs = Tabs(tabs=[map_panel])
+grafiek = column(Div(text="grafiek"),sizing_mode="stretch_both")
+grafiek.name =  "grafiek"
+grafiek_lr = column(Div(text="grafiek_lr"),name="grafiek_lr",sizing_mode="stretch_both")
+grafiek_slider = column(Div(text="grafiek_slider"),name="grafiek_slider",sizing_mode="stretch_both")
+
+time_panel = Panel(child=Div(), title="grafiek", name="grafiek")
+tabs = Tabs(tabs=[map_panel, time_panel], name="tabs")
 
 div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
           (laatste update: 02-02-2021)<b></p>""", height=int(height * 0.05))
 
-layout = row(column(div,
-                    select_filter,
-                    select_locations,
-                    select_parameters,
-                    search_period_slider,
-                    select_search_timeseries), tabs)
+if USE_JINJA_TEMPLATE:
+    kaart = column(map_fig,name="kaart",sizing_mode="stretch_both")
+    Filters = column(select_filter, name="Filters", sizing_mode= "stretch_both")
+    Locaties = column(select_locations, name="Locaties", sizing_mode= "stretch_both")
+    Parameters = column(select_parameters, name="Parameters", sizing_mode= "stretch_both")
+    Slider = column(search_period_slider, name="Slider", sizing_mode= "stretch_both")
+    Zoektijdserie = column(select_search_timeseries, name="Zoektijdserie", sizing_mode= "stretch_both")
 
+    curdoc().add_root(Filters)
+    curdoc().add_root(Locaties)
+    curdoc().add_root(Parameters)
+    curdoc().add_root(Slider)
+    curdoc().add_root(Zoektijdserie)
+    curdoc().add_root(kaart)
+    curdoc().add_root(grafiek)
+    curdoc().add_root(grafiek_lr)
+    curdoc().add_root(grafiek_slider)
 
-curdoc().add_root(layout)
-curdoc().title = TITLE
+else:
+    layout = row(column(div,
+                        select_filter,
+                        select_locations,
+                        select_parameters,
+                        search_period_slider,
+                        select_search_timeseries), tabs)
+    
+    
+    curdoc().add_root(layout)
+    curdoc().title = TITLE

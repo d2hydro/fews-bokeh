@@ -11,9 +11,9 @@ from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 
 
-def generate(width,
-             height,
-             bounds,
+def generate(width=None,
+             height=None,
+             bounds=None,
              glyphs=None,
              active_scroll="wheel_zoom"):
     """Map-figure from supplied bokeh input parameters."""

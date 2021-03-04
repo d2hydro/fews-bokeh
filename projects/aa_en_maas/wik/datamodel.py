@@ -477,71 +477,72 @@ class Data(object):
                             ts["events"]["value"].max()]
 
             self.timeseries = pd.DataFrame(timeseries)
-            self.timeseries["label"] = self.timeseries.apply(
-                (lambda x: f"{x['location_name']} ({x['parameter_name']})"),
-                axis=1)
-            self.timeseries.set_index(["location_id", "parameter_id"],
-                                      inplace=True,
-                                      drop=False)
-            self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
-                int(float(self.time_zone)))
+            if not self.timeseries.empty:
+                self.timeseries["label"] = self.timeseries.apply(
+                    (lambda x: f"{x['location_name']} ({x['parameter_name']})"),
+                    axis=1)
+                self.timeseries.set_index(["location_id", "parameter_id"],
+                                          inplace=True,
+                                          drop=False)
+                self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
+                    int(float(self.time_zone)))
 
-            # if len(x_bounds['start']) > 0:
-            #     x_bounds['start'] = min(x_bounds['start'])
-            # else:
-            #     x_bounds['start'] = self.start_datetime
+                # if len(x_bounds['start']) > 0:
+                #     x_bounds['start'] = min(x_bounds['start'])
+                # else:
+                #     x_bounds['start'] = self.start_datetime
 
-            # if len(x_bounds['end']) > 0:
-            #     x_bounds['end'] = max(x_bounds['end'])
-            # else:
-            #     x_bounds['end'] = self.end_datetime
+                # if len(x_bounds['end']) > 0:
+                #     x_bounds['end'] = max(x_bounds['end'])
+                # else:
+                #     x_bounds['end'] = self.end_datetime
 
-            # self.x_bounds = x_bounds
-            for group in self.hr_glyphs.keys():
-                if len(self.hr_graphs[group]['y_bounds']['start']) > 0:
-                    self.hr_graphs[group]['y_bounds']['start'] = min(
-                        self.hr_graphs[group]['y_bounds']['start'])
-                else:
-                    self.hr_graphs[group]['y_bounds']['start'] = 0
+                # self.x_bounds = x_bounds
+                for group in self.hr_glyphs.keys():
+                    if len(self.hr_graphs[group]['y_bounds']['start']) > 0:
+                        self.hr_graphs[group]['y_bounds']['start'] = min(
+                            self.hr_graphs[group]['y_bounds']['start'])
+                    else:
+                        self.hr_graphs[group]['y_bounds']['start'] = 0
 
-                if len(self.hr_graphs[group]['y_bounds']['end']) > 0:
-                    self.hr_graphs[group]['y_bounds']['end'] = max(
-                        self.hr_graphs[group]['y_bounds']['end'])
-                else:
-                    self.hr_graphs[group]['y_bounds']['end'] = 1
-                if self.hr_graphs[group]['y_bounds'][
-                        'end'] == self.hr_graphs[group]['y_bounds']['start']:
-                    self.hr_graphs[group]['y_bounds']['end'] += 0.1
-                    self.hr_graphs[group]['y_bounds']['start'] -= 0.1
-                self.hr_graphs[group]['y_range'] = Range1d(
-                    start=self.hr_graphs[group]['y_bounds']['start'],
-                    end=self.hr_graphs[group]['y_bounds']['end'],
-                    bounds=None)
+                    if len(self.hr_graphs[group]['y_bounds']['end']) > 0:
+                        self.hr_graphs[group]['y_bounds']['end'] = max(
+                            self.hr_graphs[group]['y_bounds']['end'])
+                    else:
+                        self.hr_graphs[group]['y_bounds']['end'] = 1
+                    if self.hr_graphs[group]['y_bounds'][
+                            'end'] == self.hr_graphs[group]['y_bounds']['start']:
+                        self.hr_graphs[group]['y_bounds']['end'] += 0.1
+                        self.hr_graphs[group]['y_bounds']['start'] -= 0.1
+                    self.hr_graphs[group]['y_range'] = Range1d(
+                        start=self.hr_graphs[group]['y_bounds']['start'],
+                        end=self.hr_graphs[group]['y_bounds']['end'],
+                        bounds=None)
 
-            # low resolution data
-            location_id = self.timeseries.iloc[0]['location_id']
-            parameter_id = self.timeseries.iloc[0]['parameter_id']
+                # low resolution data
+                location_id = self.timeseries.iloc[0]['location_id']
+                parameter_id = self.timeseries.iloc[0]['parameter_id']
 
-            result = self.get_lr_data(filter_id,
-                                      location_id,
-                                      parameter_id)
+                result = self.get_lr_data(filter_id,
+                                          location_id,
+                                          parameter_id)
 
-            if result is not None:
-                ts = next(
-                    (ts for ts in result[1] if not ts[
-                        'events'].empty), None)
-            if ts is not None:
-                self.lr_data = ts["events"]
-                self.search_value = {"parameter": ts["header"]["parameterId"],
-                                     "location": ts["header"]["locationId"]}
+                if result is not None:
+                    ts = next(
+                        (ts for ts in result[1] if not ts[
+                            'events'].empty), None)
+                if ts is not None:
+                    self.lr_data = ts["events"]
+                    self.search_value = {"parameter": ts["header"]["parameterId"],
+                                         "location": ts["header"]["locationId"]}
 
-            source = ColumnDataSource(self.lr_data)
-            colors = cycle(palette)
-            self.lr_glyph = {"type": "line",
-                             "color": next(colors),
-                             "source": source}
-            y_start = math.floor(min(source.data["value"]) * 10) / 10
-            y_end = math.ceil(max(source.data["value"]) * 10) / 10
-            self.lr_y_range.start = y_start
-            self.lr_y_range.end = y_end
-            # print(y_start, y_end)
+                source = ColumnDataSource(self.lr_data)
+                colors = cycle(palette)
+                self.lr_glyph = {"type": "line",
+                                 "color": next(colors),
+                                 "source": source}
+                y_start = math.floor(min(source.data["value"]) * 10) / 10
+                y_end = math.ceil(max(source.data["value"]) * 10) / 10
+                self.lr_y_range.start = y_start
+                self.lr_y_range.end = y_end
+                # print(y_start, y_end)

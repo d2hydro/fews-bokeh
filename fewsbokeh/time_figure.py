@@ -10,8 +10,9 @@ from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 
 
-def generate(width,
-             height,
+def generate(width=None,
+             height=None,
+             sizing_mode=None,
              x_bounds=None,
              y_bounds=None,
              x_range=None,
@@ -43,6 +44,7 @@ def generate(width,
                       active_drag=None,
                       height=height,
                       width=width,
+                      sizing_mode=sizing_mode,
                       x_axis_label=x_axis_label,
                       y_axis_label=y_axis_label,
                       x_range=x_range,
