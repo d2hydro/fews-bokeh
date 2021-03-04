@@ -383,7 +383,6 @@ select_filter.on_change("value", update_on_filter_select)
 select_locations = MultiSelect(title="Locaties:",
                                value=[],
                                options=data.locations.names)
-select_locations.height = int(height * 0.25)
 
 select_locations.on_change("value", update_on_locations_select)
 
