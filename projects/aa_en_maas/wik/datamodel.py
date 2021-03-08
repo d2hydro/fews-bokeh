@@ -371,7 +371,9 @@ class Data(object):
                      start_datetime,
                      search_start_datetime):
             self.hr_data = None
-            self.lr_data = None
+            self.lr_data = pd.DataFrame({"datetime": [],
+                                         "value": []})
+            self.lr_src = ColumnDataSource(self.lr_data)
             self.fews_api = fews_api
             self.logger = logger
             self.start_datetime = start_datetime
@@ -385,9 +387,12 @@ class Data(object):
             self.title = None
             self.hr_graphs = None
             self.x_bounds = None
+            self.x_axis_label = "datum-tijd [gmt +1]"
             self.lr_y_range = Range1d(start=-0.1, end=0.1, bounds=None)
             self.hr_glyphs = None
-            self.lr_glyph = None
+            self.lr_glyph = {"type": "line",
+                             "color": palette[0],
+                             "source": self.lr_src}
 
         def get_lr_data(self,
                         filter_id,
@@ -445,36 +450,40 @@ class Data(object):
             colors = cycle(palette)
             # x_bounds = {'start': [], 'end': []}
             for ts in self.hr_data:
+                if "header" in ts.keys():
+                    header = ts["header"]
+                    group = self.fews_api.parameters.loc[header["parameterId"]][
+                            "parameterGroup"]
+                    color = next(colors)
+                    short_name = self.fews_api.locations.loc[header[
+                        "locationId"]]["shortName"]
+                    parameter_name = self.fews_api.parameters.loc[header[
+                        "parameterId"]]["name"]
+                    ts_specs = {"location_id": header["locationId"],
+                                "location_name": short_name,
+                                "parameter_id": header["parameterId"],
+                                "parameter_name": parameter_name,
+                                "parameter_group": group}
                 if "events" in ts.keys():
                     if not ts["events"].empty:
-                        header = ts["header"]
-                        group = self.fews_api.parameters.loc[header["parameterId"]][
-                            "parameterGroup"]
-                        color = next(colors)
-                        short_name = self.fews_api.locations.loc[header[
-                            "locationId"]]["shortName"]
-                        parameter_name = self.fews_api.parameters.loc[header[
-                            "parameterId"]]["name"]
                         source = ColumnDataSource(ts["events"])
-                        timeseries += [
-                            {"location_id": header["locationId"],
-                             "location_name": short_name,
-                             "parameter_id": header["parameterId"],
-                             "parameter_name": parameter_name,
-                             "parameter_group": group,
-                             "source": source}]
-                        self.hr_glyphs[group] += [
-                            {"type": "line",
-                             "color": color,
-                             "source": source,
-                             "legend_label": f"{short_name} {parameter_name}"}
-                                                ]
-                        # x_bounds['start'] += [ts["events"]["datetime"].min()]
-                        # x_bounds['end'] += [ts["events"]["datetime"].max()]
                         self.hr_graphs[group]['y_bounds']['start'] += [
                             ts["events"]["value"].min()]
                         self.hr_graphs[group]['y_bounds']['end'] += [
                             ts["events"]["value"].max()]
+                else:
+                    source = ColumnDataSource({"datetime": [],
+                                                   "value": []})
+
+                    ts_specs["source"] = source
+
+                timeseries += [ts_specs]
+                self.hr_glyphs[group] += [
+                    {"type": "line",
+                     "color": color,
+                     "source": source,
+                     "legend_label": f"{short_name} {parameter_name}"}
+                                            ]
 
             self.timeseries = pd.DataFrame(timeseries)
             if not self.timeseries.empty:
@@ -536,11 +545,7 @@ class Data(object):
                     self.search_value = {"parameter": ts["header"]["parameterId"],
                                          "location": ts["header"]["locationId"]}
 
-                source = ColumnDataSource(self.lr_data)
-                colors = cycle(palette)
-                self.lr_glyph = {"type": "line",
-                                 "color": next(colors),
-                                 "source": source}
+                self.lr_src.data.update(ColumnDataSource(self.lr_data).data)
                 y_start = math.floor(min(source.data["value"]) * 10) / 10
                 y_end = math.ceil(max(source.data["value"]) * 10) / 10
                 self.lr_y_range.start = y_start
