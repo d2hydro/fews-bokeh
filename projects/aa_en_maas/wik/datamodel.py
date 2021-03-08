@@ -158,19 +158,25 @@ class Data(object):
                                              end_datetime=end_datetime)
 
         if result is not None:
-            ts = next((ts for ts in result[1] if not ts['events'].empty), None)
+            ts = next((ts for ts in result[1] if "events" in ts.keys()), None)
 
         if ts is not None:
             self.timeseries.lr_data = ts["events"]
+        else:
+            self.timeseries.lr_data = pd.DataFrame(data={"datetime": [],
+                                                         "value": []})
 
         source = ColumnDataSource(self.timeseries.lr_data)
-        self.timeseries.lr_glyph['source'].data.update(source.data)
+        self.timeseries.lr_src.data.update(source.data)
 
-        y_start = math.floor(min(source.data["value"]) * 10) / 10
-        y_end = math.ceil(max(source.data["value"]) * 10) / 10
+        if not self.timeseries.lr_data.empty:
+            y_start = (self.timeseries.lr_data["value"] * 10).apply(np.floor).min()/10
+            y_end = (self.timeseries.lr_data["value"] * 10).apply(np.ceil).max()/10
+        else:
+            y_start, y_end = [-0.1, 0.1]
+
         self.timeseries.lr_y_range.start = y_start
         self.timeseries.lr_y_range.end = y_end
-        # print(y_start, y_end)
 
     def update_hr_timeseries(self, start_datetime, end_datetime):
         """Update hr timeseries."""
@@ -382,7 +388,6 @@ class Data(object):
             self.search_start_datetime = search_start_datetime
             self.time_zone = None
             self.timeseries = None
-            self.search_value = None
             self.headers = None
             self.title = None
             self.hr_graphs = None
@@ -425,7 +430,7 @@ class Data(object):
                    parameter_ids,
                    filter_id,
                    parameter_groups):
-            # print(location_ids, parameter_ids, filter_id, parameter_groups)
+            #print(location_ids, parameter_ids, filter_id, parameter_groups)
             """Update timeseries data."""
             # high resolution data
             timespan = (self.end_datetime - self.start_datetime).days
@@ -475,7 +480,7 @@ class Data(object):
                     source = ColumnDataSource({"datetime": [],
                                                    "value": []})
 
-                    ts_specs["source"] = source
+                ts_specs["source"] = source
 
                 timeseries += [ts_specs]
                 self.hr_glyphs[group] += [
@@ -527,27 +532,3 @@ class Data(object):
                         start=self.hr_graphs[group]['y_bounds']['start'],
                         end=self.hr_graphs[group]['y_bounds']['end'],
                         bounds=None)
-
-                # low resolution data
-                location_id = self.timeseries.iloc[0]['location_id']
-                parameter_id = self.timeseries.iloc[0]['parameter_id']
-
-                result = self.get_lr_data(filter_id,
-                                          location_id,
-                                          parameter_id)
-
-                if result is not None:
-                    ts = next(
-                        (ts for ts in result[1] if not ts[
-                            'events'].empty), None)
-                if ts is not None:
-                    self.lr_data = ts["events"]
-                    self.search_value = {"parameter": ts["header"]["parameterId"],
-                                         "location": ts["header"]["locationId"]}
-
-                self.lr_src.data.update(ColumnDataSource(self.lr_data).data)
-                y_start = math.floor(min(source.data["value"]) * 10) / 10
-                y_end = math.ceil(max(source.data["value"]) * 10) / 10
-                self.lr_y_range.start = y_start
-                self.lr_y_range.end = y_end
-                # print(y_start, y_end)

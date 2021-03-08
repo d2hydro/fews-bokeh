@@ -97,24 +97,18 @@ def _create_timefig():
     """Create a time-fig."""
     if all([select_locations.value,
        select_parameters.value]):
-        print(select_locations.value, select_parameters.value)
+        # print(select_locations.value, select_parameters.value)
         data.create_timeseries(select_locations.value,
                                select_parameters.value)
 
         logger.debug("event: _create_time_fig")
-        search_value = f"{select_locations.value} ({select_parameters.value})"
 
         # update timeseries search select
         if not data.timeseries.timeseries.empty:
-            search_options = data.timeseries.timeseries["label"].to_list()
-            search_options.sort()
-            search_value = data.timeseries.timeseries.iloc[0]["label"]
 
             # difine top-figs
             top_figs = []
             glyphs = data.timeseries.hr_glyphs
-            fig_height = int(height * 0.75 * 0.85 / len(glyphs))
-
             for idx, (key, values) in enumerate(glyphs.items()):
                 if idx == 0:
                     fig_title = ",".join(select_locations.value)
@@ -130,9 +124,9 @@ def _create_timefig():
                     y_axis_label = select_parameters.value[0]
                 else:
                     fews_parameters = data.fews_api.parameters
-                    unit = fews_parameters.loc[fews_parameters["parameterGroup"] == key][
-                        "displayUnit"
-                    ].to_list()[0]
+                    unit = fews_parameters.loc[
+                        fews_parameters["parameterGroup"] == key][
+                            "displayUnit"].to_list()[0]
                     y_axis_label = f"{key} [{unit}]"
 
                 graph = data.timeseries.hr_graphs[key]
@@ -145,6 +139,10 @@ def _create_timefig():
                                                   y_range=graph['y_range'],
                                                   glyphs=values,
                                                   )]
+            # update search-data
+            ts_labels = data.timeseries.timeseries["label"].to_list()
+            select_search_timeseries.options = ts_labels
+            select_search_timeseries.value = ts_labels[0]
 
             # update layout
             search_fig.yaxis[0].ticker = [data.timeseries.lr_y_range.start,
@@ -153,96 +151,11 @@ def _create_timefig():
             search_fig.ygrid[0].ticker = [data.timeseries.lr_y_range.start,
                                           data.timeseries.lr_y_range.end]
             ts_labels = data.timeseries.timeseries["label"].to_list()
-            select_search_timeseries.options = ts_labels
-            select_search_timeseries.value = ts_labels[0]
             time_col = _create_time_col(top_figs)
             _remove_timefig()
             tabs.tabs.append(Panel(child=time_col,
                                    title="grafiek",
                                    name="grafiek"))
-            # print(top_figs[0].renderers[0].data_source.data["value"])
-            # # define search fig
-            # glyph = data.timeseries.lr_glyph
-            # x_bounds = {"start": data.timeseries.search_start_datetime,
-            #             "end": data.timeseries.search_end_datetime}
-
-            # y_bounds = {"start": 0, "end": 1}
-            # if len(glyph['source'].data['value']) > 0:
-            #     y_bounds["start"] = glyph['source'].data['value'].min()
-            #     y_bounds["end"] = glyph['source'].data['value'].max()
-
-            # lr_x_range = Range1d(start=x_bounds['start'],
-            #                      end=x_bounds['end'],
-            #                      bounds="auto")
-            # lr_fig = time_figure.generate(sizing_mode="stretch_both",
-            #                               x_axis_label=data.timeseries.x_axis_label,
-            #                               y_axis_label="",
-            #                               x_axis_visible=True,
-            #                               x_range=lr_x_range,
-            #                               y_range=data.timeseries.lr_y_range,
-            #                               show_toolbar=False,
-            #                               glyphs=[glyph])
-            # patch_src = ColumnDataSource({'x': [data.timeseries.start_datetime,
-            #                                     data.timeseries.start_datetime,
-            #                                     data.timeseries.end_datetime,
-            #                                     data.timeseries.end_datetime],
-            #                               'y': [lr_fig.y_range.start,
-            #                                     lr_fig.y_range.end,
-            #                                     lr_fig.y_range.end,
-            #                                     lr_fig.y_range.start]}
-            #                              )
-
-            # lr_fig.patch(x='x', y='y', source=patch_src, alpha=0.5, line_width=2)
-
-            # lr_fig.toolbar_location = None
-            # lr_fig.ygrid.visible = False
-            # lr_fig.yaxis[0].ticker = [y_bounds['start'], y_bounds['end']]
-            # lr_fig.ygrid[0].ticker = [y_bounds['start'], y_bounds['end']]
-
-            # # define daterange slider
-            # date_range_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
-            #                                            data.timeseries.end_datetime),
-            #                                     start=data.timeseries.search_start_datetime,
-            #                                     end=data.timeseries.search_end_datetime)
-
-            # date_range_slider.format = '%d-%m-%Y'
-            # date_range_slider.js_link('value', hr_x_range, 'start', attr_selector=0)
-            # date_range_slider.js_link('value', hr_x_range, 'end', attr_selector=1)
-            # date_range_slider.on_change("value", _update_on_date_range)
-            # date_range_slider.on_change("value_throttled", _update_on_date_range_throttled)
-
-            # search_period_slider.js_link('value', lr_x_range, 'start', attr_selector=0)
-            # search_period_slider.js_link('value', lr_x_range, 'end', attr_selector=1)
-            # search_period_slider.js_link('value',
-            #                              date_range_slider,
-            #                              'start',
-            #                              attr_selector=0)
-
-            # search_period_slider.js_link('value',
-            #                              date_range_slider,
-            #                              'end',
-            #                              attr_selector=1)
-
-#         time_figs.children.pop()
-#         search_fig.children.pop()
-#         period_slider.children.pop()
-
-#         select_search_timeseries.options = search_options
-#         select_search_timeseries.value = search_value
-# #       grafiek.children.append(column(*top_figs,
-# #                         lr_fig,
-# #                         row(Div(width=40, text=""),
-# #                                   date_range_slider, sizing_mode="stretch_both")))
-#         grafiek.children.append(column(*top_figs, sizing_mode="stretch_both"))
-#                  #        lr_fig,
-#                 #         row(Div(width=40, text=""),
-#                  #                  date_range_slider, sizing_mode="stretch_both"))
-#         grafiek_lr.children.append(column(lr_fig,sizing_mode="stretch_both"))
-#         grafiek_slider.children.append(column(date_range_slider,sizing_mode="stretch_both"))
-
-
-def _update_timefig_sources():
-    data.update_timeseries()
 
 
 def update_on_double_tap(event):
@@ -310,6 +223,7 @@ def update_on_parameters_select(attrname, old, new):
 
 def update_on_search_select(attrname, old, new):
     """Update low lr graph when user updates any selection."""
+    logger.debug("event: update_on_search_select")
     start_datetime, end_datetime = search_period_slider.value_as_datetime
     search_series = select_search_timeseries.value
     if search_series:
@@ -319,6 +233,8 @@ def update_on_search_select(attrname, old, new):
 
 
 def update_on_search_period(attrname, old, new):
+    """Update low lr graph when user updates any selection."""
+    # logger.debug("event: update_on_search_period")
     start_datetime = pd.Timestamp(new[0] * 1000000)
     end_datetime = pd.Timestamp(new[1] * 1000000)
     days = (end_datetime - start_datetime).days
@@ -334,6 +250,7 @@ def update_on_search_period(attrname, old, new):
 
 def update_on_period(attrname, old, new):
     """Update triggered by date_range_sider."""
+    # logger.debug("event: update_on_period")
     start_datetime, end_datetime = period_slider.value_as_datetime
 
     patch_src.data.update({'x': [start_datetime,
@@ -346,8 +263,9 @@ def update_on_period(attrname, old, new):
                                  search_fig.y_range.start]})
 
 
-def update_on_period_throttled(attrname, old, new):
+def update_on_period_select(attrname, old, new):
     """Update triggered by date_range_sider throttled."""
+    logger.debug("event: update_on_period_select")
     start_datetime, end_datetime = period_slider.value_as_datetime
     data.update_hr_timeseries(start_datetime, end_datetime)
     time_figs_x_range.reset_start = start_datetime
@@ -509,6 +427,9 @@ search_period_slider.js_link('value',
                              attr_selector=1)
 
 period_slider.on_change("value", update_on_period)
+period_slider.on_change("value_throttled", update_on_period_select)
+period_slider.js_link('value', time_figs_x_range, 'start', attr_selector=0)
+period_slider.js_link('value', time_figs_x_range, 'end', attr_selector=1)
 
 # %% define layout
 width = 1920 * 0.82
