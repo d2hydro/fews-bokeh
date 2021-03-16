@@ -15,13 +15,16 @@ from logging.handlers import RotatingFileHandler
 from bokeh.plotting import figure
 from bokeh import events
 from bokeh.io import curdoc
+from bokeh.events import PanEnd
 from bokeh.models.widgets import (
     Div,
+    Button,
     Select,
     Panel,
     Tabs,
     MultiSelect,
     RangeSlider,
+    DatePicker,
     Slider,
     DateRangeSlider,
     HTMLTemplateFormatter
@@ -139,6 +142,11 @@ def _create_timefig():
                                                   y_range=graph['y_range'],
                                                   glyphs=values,
                                                   )]
+
+            # register PanEnd event on all plots
+            for plot in top_figs:
+                plot.on_event(PanEnd, update_on_top_figs_tools)
+       
             # update search-data
             ts_labels = data.timeseries.timeseries["label"].to_list()
             select_search_timeseries.options = ts_labels
@@ -156,7 +164,6 @@ def _create_timefig():
             tabs.tabs.append(Panel(child=time_col,
                                    title="grafiek",
                                    name="grafiek"))
-
 
 def update_on_double_tap(event):
     """Reset selected locarions on double tab."""
@@ -224,7 +231,8 @@ def update_on_parameters_select(attrname, old, new):
 def update_on_search_select(attrname, old, new):
     """Update low lr graph when user updates any selection."""
     logger.debug("event: update_on_search_select")
-    start_datetime, end_datetime = search_period_slider.value_as_datetime
+    start_datetime = pd.Timestamp(search_start_date_picker.value)
+    end_datetime = pd.Timestamp(search_end_date_picker.value)
     search_series = select_search_timeseries.value
     if search_series:
         data.update_lr_timeseries(search_series,
@@ -232,7 +240,7 @@ def update_on_search_select(attrname, old, new):
                                   end_datetime)
 
 
-def update_on_search_period(attrname, old, new):
+def follow_period_interval(attrname, old, new):
     """Update low lr graph when user updates any selection."""
     # logger.debug("event: update_on_search_period")
     start_datetime = pd.Timestamp(new[0] * 1000000)
@@ -241,11 +249,11 @@ def update_on_search_period(attrname, old, new):
     if days > 150:
         if old[0] != new[0]:
             # starttime is shifting
-            search_period_slider.value = (
+            period_slider.value = (
                 start_datetime, start_datetime + pd.Timedelta(days=150))
         else:
-            search_period_slider.value = (
-                end_datetime - pd.Timedelta(days=150), start_datetime)
+            period_slider.value = (
+                end_datetime - pd.Timedelta(days=150), end_datetime)
 
 
 def update_on_period(attrname, old, new):
@@ -253,14 +261,44 @@ def update_on_period(attrname, old, new):
     # logger.debug("event: update_on_period")
     start_datetime, end_datetime = period_slider.value_as_datetime
 
-    patch_src.data.update({'x': [start_datetime,
-                                 start_datetime,
-                                 end_datetime,
-                                 end_datetime],
+    days = (end_datetime - start_datetime).days
+    if days > 90:
+        if old[0] != new[0]:
+            # starttime is shifting
+            period_slider.value = (
+                start_datetime, start_datetime + pd.Timedelta(days=90))
+        else:
+            period_slider.value = (
+                end_datetime - pd.Timedelta(days=90), end_datetime)
+
+    patch_src.data.update({'x': [period_slider.value[0],
+                                 period_slider.value[0],
+                                 period_slider.value[1],
+                                 period_slider.value[1]],
                            'y': [search_fig.y_range.start,
                                  search_fig.y_range.end,
                                  search_fig.y_range.end,
                                  search_fig.y_range.start]})
+
+
+def update_on_top_figs_tools(event):
+    """Update triggered by date_range_sider throttled."""
+    logger.debug("event: update_on_period_select")
+    start_datetime = pd.Timestamp(time_figs_x_range.start * 10**6)
+    end_datetime = pd.Timestamp(time_figs_x_range.end * 10**6)
+    data.update_hr_timeseries(start_datetime, end_datetime)
+
+    period_slider.value = (start_datetime, end_datetime)
+    # patch_src.data.update({'x': [start_datetime,
+    #                              start_datetime,
+    #                              end_datetime,
+    #                              end_datetime],
+    #                        'y': [search_fig.y_range.start,
+    #                              search_fig.y_range.end,
+    #                              search_fig.y_range.end,
+    #                              search_fig.y_range.start]})
+    # time_figs_x_range.reset_start = start_datetime
+    # time_figs_x_range.reset_end = end_datetime
 
 
 def update_on_period_select(attrname, old, new):
@@ -270,6 +308,29 @@ def update_on_period_select(attrname, old, new):
     data.update_hr_timeseries(start_datetime, end_datetime)
     time_figs_x_range.reset_start = start_datetime
     time_figs_x_range.reset_end = end_datetime
+
+
+def update_search_range(attrname, old, new):
+    """Update search range by event."""
+    logger.debug("event: update_search_range")
+    start_datetime = pd.Timestamp(search_start_date_picker.value)
+    end_datetime = pd.Timestamp(search_end_date_picker.value)
+    search_range.start = start_datetime
+    search_range.end = end_datetime
+    period_slider.start = start_datetime
+    period_slider.end = end_datetime
+
+
+def update_search_fig():
+    """Update low lr graph when user updates any selection."""
+    logger.debug("event: update_search_fig")
+    start_datetime = pd.Timestamp(search_start_date_picker.value)
+    end_datetime = pd.Timestamp(search_end_date_picker.value)
+    search_series = select_search_timeseries.value
+    if search_series:
+        data.update_lr_timeseries(search_series,
+                                  start_datetime,
+                                  end_datetime)
 
 
 log_dir = LOG_FILE.parent
@@ -346,15 +407,36 @@ select_parameters = MultiSelect(title="Parameters:",
 select_parameters.on_change("value", update_on_parameters_select)
 
 # %% define search period selection
-search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
-                                              data.now),
-                                       start=data.first_value_datetime,
-                                       end=data.now,
-                                       title="Zoekperiode")
+# search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
+#                                              data.now),
+#                                       start=data.first_value_datetime,
+#                                       end=data.now,
+#                                       title="Zoekperiode")
 
-search_period_slider.format = '%d-%m-%Y'
-search_period_slider.on_change("value", update_on_search_period)
-search_period_slider.on_change("value_throttled", update_on_search_select)
+search_start_date_picker = DatePicker(
+    title='start datum',
+    value=data.search_start_datetime.strftime('%Y-%m-%d'),
+    min_date=data.first_value_datetime.strftime('%Y-%m-%d'),
+    max_date=data.search_start_datetime.strftime('%Y-%m-%d')
+    )
+
+search_end_date_picker = DatePicker(
+    title='eind datum',
+    value=data.now.strftime('%Y-%m-%d'),
+    min_date=data.search_start_datetime.strftime('%Y-%m-%d'),
+    max_date=data.now.strftime('%Y-%m-%d')
+    )
+
+
+search_start_date_picker.on_change("value", update_search_range)
+search_end_date_picker.on_change("value", update_search_range)
+
+search_button = Button(label="update zoekgrafiek", button_type="success")
+search_button.on_click(update_search_fig)
+
+# search_period_slider.format = '%d-%m-%Y'
+# search_period_slider.on_change("value", update_on_search_period)
+# search_period_slider.on_change("value_throttled", update_on_search_select)
 
 select_search_timeseries = Select(title="Zoektijdserie:", value=None, options=[])
 select_search_timeseries.on_change("value", update_on_search_select)
@@ -362,8 +444,7 @@ select_search_timeseries.on_change("value", update_on_search_select)
 # %% define empty time_figs
 
 time_figs_x_range = Range1d(start=data.timeseries.start_datetime,
-                            end=data.timeseries.end_datetime,
-                            bounds="auto")
+                            end=data.timeseries.end_datetime)
 
 time_figs_y_range = Range1d(start=-1,
                             end=1,
@@ -376,8 +457,8 @@ time_figs = [time_figure.generate(
     x_range=time_figs_x_range,
     y_range=time_figs_y_range)]
 
-search_range = Range1d(start=search_period_slider.value[0],
-                       end=search_period_slider.value[1],
+search_range = Range1d(start=pd.Timestamp(search_start_date_picker.value),
+                       end=pd.Timestamp(search_end_date_picker.value),
                        bounds="auto")
 
 search_fig = time_figure.generate(x_axis_label=data.timeseries.x_axis_label,
@@ -414,17 +495,21 @@ period_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
                                 end=data.timeseries.search_end_datetime)
 period_slider.format = '%d-%m-%Y'
 
-search_period_slider.js_link('value', search_range, 'start', attr_selector=0)
-search_period_slider.js_link('value', search_range, 'end', attr_selector=1)
-search_period_slider.js_link('value',
-                             period_slider,
-                             'start',
-                             attr_selector=0)
 
-search_period_slider.js_link('value',
-                             period_slider,
-                             'end',
-                             attr_selector=1)
+# search_start_date_picker.js_link('value', search_range, 'start')
+# search_end_date_picker.js_link('value', search_range, 'end')
+
+# search_period_slider.js_link('value', search_range, 'start', attr_selector=0)
+# search_period_slider.js_link('value', search_range, 'end', attr_selector=1)
+# search_period_slider.js_link('value',
+#                              period_slider,
+#                              'start',
+#                              attr_selector=0)
+
+# search_period_slider.js_link('value',
+#                              period_slider,
+#                              'end',
+#                              attr_selector=1)
 
 period_slider.on_change("value", update_on_period)
 period_slider.on_change("value_throttled", update_on_period_select)
@@ -435,7 +520,7 @@ period_slider.js_link('value', time_figs_x_range, 'end', attr_selector=1)
 width = 1920 * 0.82
 height = 1080 * 0.82
 div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
-          (laatste update: 02-02-2021)<b></p>""", height=int(height * 0.05))
+          (laatste update: 16-03-2021)<b></p>""", height=int(height * 0.05))
 
 if USE_JINJA_TEMPLATE:
 
@@ -476,11 +561,23 @@ else:
     tabs = Tabs(tabs=[map_panel, time_panel],
                 name="tabs")
 
+#    search_start_date_picker.width = int(width * 0.08)
+#    search_end_date_picker.width = int(width * 0.08)
+#    search_button.width = int(width * 0.2)
+    search_start_date_picker.sizing_mode = "stretch_both"
+    search_end_date_picker.sizing_mode = "stretch_both"
+    search_button.sizing_mode = "stretch_width"
+    search_period_control = column(row(
+        search_start_date_picker,
+        search_end_date_picker),
+        search_button)
+
+    search_period_control.width = int(width * 0.2)
     controls = column(div,
                       select_filter,
                       select_locations,
                       select_parameters,
-                      search_period_slider,
+                      search_period_control,
                       select_search_timeseries)
     controls.height = int(height * 0.75 - 80)
     layout = row(controls, tabs)
