@@ -48,7 +48,8 @@ def _screen_resolution():
 
     return width, height
 
-if USE_JINJA_TEMPLATE == False:
+if USE_JINJA_TEMPLATE==False:
+
     def _remove_timefig():
         index = True
         
@@ -60,11 +61,11 @@ if USE_JINJA_TEMPLATE == False:
                 tabs.tabs.remove(tabs.tabs[index])
 
 
-def _activate_timefig():
-    index = next((idx for idx, tab in enumerate(tabs.tabs) if tab.name == 'grafiek'),
+    def _activate_timefig():
+        index = next((idx for idx, tab in enumerate(tabs.tabs) if tab.name == 'grafiek'),
                  None)
 
-    tabs.active = index
+        tabs.active = index
 
 
 def _datetime_offset(values, offset_years):
@@ -154,15 +155,16 @@ def _create_timefig():
             select_search_timeseries.value = ts_labels[0]
 
             # update layout
-            search_fig.yaxis[0].ticker = [data.timeseries.lr_y_range.start,
-                                          data.timeseries.lr_y_range.end]
+   #         search_fig.yaxis[0].ticker = [data.timeseries.lr_y_range.start,
+  #                                        data.timeseries.lr_y_range.end]
 
-            search_fig.ygrid[0].ticker = [data.timeseries.lr_y_range.start,
-                                          data.timeseries.lr_y_range.end]
+  #          search_fig.ygrid[0].ticker = [data.timeseries.lr_y_range.start,
+  #                                        data.timeseries.lr_y_range.end]
             ts_labels = data.timeseries.timeseries["label"].to_list()
             time_col = _create_time_col(top_figs)
-            _remove_timefig()
-            tabs.tabs.append(Panel(child=time_col,
+            if USE_JINJA_TEMPLATE==False:
+                _remove_timefig()
+                tabs.tabs.append(Panel(child=time_col,
                                    title="grafiek",
                                    name="grafiek"))
 
