@@ -48,16 +48,16 @@ def _screen_resolution():
 
     return width, height
 
-
-def _remove_timefig():
-    index = True
-
-    while index:
-        index = next((idx for idx, tab in enumerate(tabs.tabs)
+if USE_JINJA_TEMPLATE == False:
+    def _remove_timefig():
+        index = True
+        
+        while index:
+            index = next((idx for idx, tab in enumerate(tabs.tabs)
                       if tab.name == 'grafiek'),
                      None)
-        if index:
-            tabs.tabs.remove(tabs.tabs[index])
+            if index:
+                tabs.tabs.remove(tabs.tabs[index])
 
 
 def _activate_timefig():
@@ -525,26 +525,33 @@ div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikke
 
 if USE_JINJA_TEMPLATE:
 
-    time_figs = column(time_figs)
-    time_figs.name =  "grafiek"
-    search_fig = column(Div(text="grafiek_lr"),name="grafiek_lr",sizing_mode="stretch_both")
-    grafiek_slider = column(Div(text="grafiek_slider"),name="grafiek_slider",sizing_mode="stretch_both")
+    
+#    search_fig = column(Div(text="grafiek_lr"),name="grafiek_lr",sizing_mode="stretch_both")
+#    grafiek_slider = column(,name="grafiek_slider",sizing_mode="stretch_both")
+    
+    filters = column(select_filter, name="filters", sizing_mode= "stretch_both")
+    locaties = column(select_locations, name="locaties", sizing_mode= "stretch_both")
+    parameters = column(select_parameters, name="parameters", sizing_mode= "stretch_both")
+    start_datepicker = column(search_start_date_picker, name="start_datepicker", sizing_mode= "stretch_both")
+    end_datepicker = column(search_end_date_picker, name="end_datepicker", sizing_mode= "stretch_both")
+    search_button = column(search_button, name="search_button", sizing_mode= "stretch_both")
+    zoektijdserie = column(div, select_search_timeseries, name="zoektijdserie", sizing_mode= "stretch_both")
     kaart = column(map_fig,name="kaart",sizing_mode="stretch_both")
-    Filters = column(select_filter, name="Filters", sizing_mode= "stretch_both")
-    Locaties = column(select_locations, name="Locaties", sizing_mode= "stretch_both")
-    Parameters = column(select_parameters, name="Parameters", sizing_mode= "stretch_both")
-    Slider = column(search_period_slider, name="Slider", sizing_mode= "stretch_both")
-    Zoektijdserie = column(select_search_timeseries, name="Zoektijdserie", sizing_mode= "stretch_both")
-
-    curdoc().add_root(Filters)
-    curdoc().add_root(Locaties)
-    curdoc().add_root(Parameters)
-    curdoc().add_root(Slider)
-    curdoc().add_root(Zoektijdserie)
+    grafiek = column(time_figs, name = "grafiek", sizing_mode="stretch_both")
+    lr_fig = column(search_fig,name="grafiek_lr",sizing_mode="stretch_both")
+    slider = column(period_slider,name="slider",sizing_mode="stretch_both")
+    
+    curdoc().add_root(filters)
+    curdoc().add_root(locaties)
+    curdoc().add_root(parameters)
+    curdoc().add_root(start_datepicker)
+    curdoc().add_root(end_datepicker)
+    curdoc().add_root(search_button)  
+    curdoc().add_root(zoektijdserie)
     curdoc().add_root(kaart)
-    curdoc().add_root(time_figs)
-    curdoc().add_root(search_fig)
-    curdoc().add_root(period_slider)
+    curdoc().add_root(grafiek)
+    curdoc().add_root(lr_fig)
+    curdoc().add_root(slider)
 
 else:
     select_locations.size = 10

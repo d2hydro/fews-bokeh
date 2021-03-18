@@ -1,0 +1,48 @@
+
+{% extends base %}
+
+{% block preamble %}
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="c:\Users\ngoor\Projects\BOKEH\fews-bokeh\projects\aa_en_maas\wik\templates\template.css">
+{% endblock %}
+
+{% block contents%}
+<div class="container-fluid">
+  <div class="row" style="height: 250px;">  
+    <div class="col-4">
+      <div class="row h-20">
+        {{ embed(roots.Filters) }} 
+      </div>
+      <div class="row h-20">
+        {{ embed(roots.Locaties) }}
+      </div>
+      <div class="row h-20">
+       {{ embed(roots.Parameters) }}
+      </div>
+      <div class="row h-20">
+        {{ embed(roots.Slider) }}      
+      </div>
+      <div class="row h-20">
+        {{ embed(roots.Zoektijdserie) }}
+      </div>   
+    </div>
+    <div class="col-8 big-box">
+      <div class="row h-100">
+        {{ embed(roots.kaart) }}
+      </div>
+    </div>
+  </div>
+  <div class="row" style="height: 250px">   
+    {{ embed(roots.grafiek) }}
+  </div>
+  <div class="rows" style="height: 100px">
+    {{ embed(roots.grafiek_lr) }}
+  </div>
+  <div class="row style="height: 50px">
+    {{ embed(roots.grafiek_slider) }}
+  </div> 
+</div> 
+
+{% endblock %}
+
+    

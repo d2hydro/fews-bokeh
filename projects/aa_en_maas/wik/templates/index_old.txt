@@ -1,0 +1,73 @@
+{% extends base %}
+
+{% block preamble %}
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+{% endblock %}
+
+<div class="row container">
+  <div class="col-md-4 first">
+    <p> ... VERY LONG CONTENT ... </p></div>
+  <div class="col-md-4 second">
+    <div class="row">
+      Telephone number
+    </div>
+    <div class="row">
+      Address
+    </div>
+    <div class="row">
+      email
+    </div>
+  </div>
+  <div class="col-md-4 third">
+    Something else, vertically centered
+  </div>
+</div>
+
+
+{% block contents%}
+    <div class="container">
+        <div class="row">
+            <div class="col-3">
+                <h1>WIK</h1>
+            </div>
+            <div class="col-9">
+                <h4>
+                    Aa en Maas
+                </h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Filters) }}
+            </div>
+            <div class="col-9">
+                {{ embed(roots.grafiek) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Locaties) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Parameters) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                {{ embed(roots.Slider) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                {{ embed(roots.Zoektijdserie) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                {{ embed(roots.map_fig) }}
+            </div>
+        </div>     
+    </div>
+{% endblock %}

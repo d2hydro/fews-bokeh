@@ -1,0 +1,53 @@
+{% extends base %}
+
+{% block preamble %}
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+{% endblock %}
+
+{% block contents%}
+    <div class="container">
+        <div class="row">
+            <div class="col-3">
+                <h1>WIK</h1>
+            </div>
+            <div class="col-9">
+                <h4>
+                    Aa en Maas
+                </h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Filters) }}
+            </div>
+            <div class="col-9">
+                {{ embed(roots.grafiek) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Locaties) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3">
+                {{ embed(roots.Parameters) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                {{ embed(roots.Slider) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                {{ embed(roots.Zoektijdserie) }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                {{ embed(roots.map_fig) }}
+            </div>
+        </div>     
+    </div>
+{% endblock %}
