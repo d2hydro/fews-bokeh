@@ -41,7 +41,7 @@ def generate(width=None,
                           bounds=bound_limits)
     time_fig = figure(title=title,
                       tools=tools,
-                      active_drag=None,
+                      # active_drag=None,
                       height=height,
                       width=width,
                       sizing_mode=sizing_mode,

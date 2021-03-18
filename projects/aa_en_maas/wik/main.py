@@ -90,11 +90,12 @@ def _create_time_col(time_figs):
 
     time_col = column(time_figs)
     time_col.children.append(search_fig)
+    # time_col.children.append(period_slider)
     time_col.children.append(row(Div(width=40, text=""),
                                  period_slider))
 
     return time_col
-    
+
 
 def _create_timefig():
     """Create a time-fig."""
@@ -552,8 +553,11 @@ else:
     search_fig.width = int(width * 0.75)
     search_fig.height = int(height * 0.15 * 0.75)
     period_slider.width = int(width * 0.75 - 80)
+    period_slider.align = "center"
 
     time_col = _create_time_col(time_figs)
+
+    time_col.align = 'end'
 
     time_panel = Panel(child=time_col,
                        title="grafiek",
