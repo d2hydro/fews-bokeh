@@ -22,3 +22,6 @@ fewsbokeh.zip
 projects/aa_en_maas/wik/scripts/test_snippets.py
 projects/aa_en_maas/wik/scripts/datepicker.py
 projects/aa_en_maas/wik/scripts/slider.py
+projects/aa_en_maas/static/*
+projects/log/*
+projects/aa_en_maas/wik/user_config.py

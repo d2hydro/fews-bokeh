@@ -1,6 +1,4 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from server_config import SERVER, USE_JINJA_TEMPLATE
-
 from config import (
     TITLE,
     LOG_LEVEL,
@@ -38,6 +36,7 @@ import os
 from datamodel import Data
 import pandas as pd
 
+USE_JINJA_TEMPLATE = False
 _UNITS_MAPPING = dict(nonequidistant="noneq", second="sec")
 
 
@@ -48,24 +47,23 @@ def _screen_resolution():
 
     return width, height
 
-if USE_JINJA_TEMPLATE==False:
 
-    def _remove_timefig():
-        index = True
-        
-        while index:
-            index = next((idx for idx, tab in enumerate(tabs.tabs)
+def _remove_timefig():
+    index = True
+
+    while index:
+        index = next((idx for idx, tab in enumerate(tabs.tabs)
                       if tab.name == 'grafiek'),
                      None)
-            if index:
-                tabs.tabs.remove(tabs.tabs[index])
+        if index:
+            tabs.tabs.remove(tabs.tabs[index])
 
 
-    def _activate_timefig():
-        index = next((idx for idx, tab in enumerate(tabs.tabs) if tab.name == 'grafiek'),
+def _activate_timefig():
+    index = next((idx for idx, tab in enumerate(tabs.tabs) if tab.name == 'grafiek'),
                  None)
 
-        tabs.active = index
+    tabs.active = index
 
 
 def _datetime_offset(values, offset_years):
@@ -84,20 +82,18 @@ def _clean_filters():
     select_parameters.value = parameters_select
 
 
-if USE_JINJA_TEMPLATE==False:
-    def _create_time_col(time_figs):
-        for fig in time_figs:
-            fig.height = int(height * 0.78 * 0.75 / len(time_figs))
-            fig.width = int(width * 0.75)
+def _create_time_col(time_figs):
+    for fig in time_figs:
+        fig.height = int(height * 0.78 * 0.75 / len(time_figs))
+        fig.width = int(width * 0.75)
 
-        time_col = column(time_figs)
-        time_col.children.append(search_fig)
-        # time_col.children.append(period_slider)
-        time_col.children.append(row(Div(width=40, text=""),
-                                     period_slider))
+    time_col = column(time_figs)
+    time_col.children.append(search_fig)
+    time_col.children.append(row(Div(width=40, text=""),
+                                 period_slider))
 
-        return time_col
-
+    return time_col
+    
 
 def _create_timefig():
     """Create a time-fig."""
@@ -145,8 +141,7 @@ def _create_timefig():
                                                   y_range=graph['y_range'],
                                                   glyphs=values,
                                                   )]
-            
-        
+
             # register PanEnd event on all plots
             for plot in top_figs:
                 plot.on_event(PanEnd, update_on_top_figs_tools)
@@ -155,20 +150,20 @@ def _create_timefig():
             ts_labels = data.timeseries.timeseries["label"].to_list()
             select_search_timeseries.options = ts_labels
             select_search_timeseries.value = ts_labels[0]
-            
-                
+
+            # update layout
+            search_fig.yaxis[0].ticker = [data.timeseries.lr_y_range.start,
+                                          data.timeseries.lr_y_range.end]
+
+            search_fig.ygrid[0].ticker = [data.timeseries.lr_y_range.start,
+                                          data.timeseries.lr_y_range.end]
             ts_labels = data.timeseries.timeseries["label"].to_list()
-            if USE_JINJA_TEMPLATE==False:
-                time_col = _create_time_col(top_figs)
-            
-                _remove_timefig()
-                tabs.tabs.append(Panel(child=time_col,
+            time_col = _create_time_col(top_figs)
+            _remove_timefig()
+            tabs.tabs.append(Panel(child=time_col,
                                    title="grafiek",
                                    name="grafiek"))
-            
-            grafiek.children.pop()
-            grafiek.children.append(column(*top_figs, sizing_mode="stretch_both"))
-            
+
 def update_on_double_tap(event):
     """Reset selected locarions on double tab."""
     logger.debug("event: update_on_double_tap")
@@ -293,6 +288,17 @@ def update_on_top_figs_tools(event):
     data.update_hr_timeseries(start_datetime, end_datetime)
 
     period_slider.value = (start_datetime, end_datetime)
+    # patch_src.data.update({'x': [start_datetime,
+    #                              start_datetime,
+    #                              end_datetime,
+    #                              end_datetime],
+    #                        'y': [search_fig.y_range.start,
+    #                              search_fig.y_range.end,
+    #                              search_fig.y_range.end,
+    #                              search_fig.y_range.start]})
+    # time_figs_x_range.reset_start = start_datetime
+    # time_figs_x_range.reset_end = end_datetime
+
 
 def update_on_period_select(attrname, old, new):
     """Update triggered by date_range_sider throttled."""
@@ -337,7 +343,7 @@ fh.setFormatter(logFormatter)
 logger.addHandler(fh)
 
 # %% allow origin to server address
-os.environ['BOKEH_ALLOW_WS_ORIGIN'] = SERVER
+os.environ['BOKEH_ALLOW_WS_ORIGIN'] = "*"
 
 # %% define the data object
 data = Data(FILTER_SELECTED, logger)
@@ -373,7 +379,6 @@ map_fig = map_figure.generate(
     glyphs=map_glyphs,
     )
 
-
 map_fig.name = "map_fig"
 map_fig.on_event(events.Tap, update_on_tap)
 map_fig.on_event(events.DoubleTap, update_on_double_tap)
@@ -401,6 +406,11 @@ select_parameters = MultiSelect(title="Parameters:",
 select_parameters.on_change("value", update_on_parameters_select)
 
 # %% define search period selection
+# search_period_slider = DateRangeSlider(value=(data.search_start_datetime,
+#                                              data.now),
+#                                       start=data.first_value_datetime,
+#                                       end=data.now,
+#                                       title="Zoekperiode")
 
 search_start_date_picker = DatePicker(
     title='start datum',
@@ -422,6 +432,10 @@ search_end_date_picker.on_change("value", update_search_range)
 
 search_button = Button(label="update zoekgrafiek", button_type="success")
 search_button.on_click(update_search_fig)
+
+# search_period_slider.format = '%d-%m-%Y'
+# search_period_slider.on_change("value", update_on_search_period)
+# search_period_slider.on_change("value_throttled", update_on_search_select)
 
 select_search_timeseries = Select(title="Zoektijdserie:", value=None, options=[])
 select_search_timeseries.on_change("value", update_on_search_select)
@@ -480,6 +494,22 @@ period_slider = DateRangeSlider(value=(data.timeseries.start_datetime,
                                 end=data.timeseries.search_end_datetime)
 period_slider.format = '%d-%m-%Y'
 
+
+# search_start_date_picker.js_link('value', search_range, 'start')
+# search_end_date_picker.js_link('value', search_range, 'end')
+
+# search_period_slider.js_link('value', search_range, 'start', attr_selector=0)
+# search_period_slider.js_link('value', search_range, 'end', attr_selector=1)
+# search_period_slider.js_link('value',
+#                              period_slider,
+#                              'start',
+#                              attr_selector=0)
+
+# search_period_slider.js_link('value',
+#                              period_slider,
+#                              'end',
+#                              attr_selector=1)
+
 period_slider.on_change("value", update_on_period)
 period_slider.on_change("value_throttled", update_on_period_select)
 period_slider.js_link('value', time_figs_x_range, 'start', attr_selector=0)
@@ -488,70 +518,43 @@ period_slider.js_link('value', time_figs_x_range, 'end', attr_selector=1)
 # %% define layout
 width = 1920 * 0.82
 height = 1080 * 0.82
-div = Div(text="""<p style="color:red"><b>Let op! Deze app is in nog in ontwikkeling!
-          (laatste update: 16-03-2021)<b></p>""", height=int(height * 0.05))
 
-if USE_JINJA_TEMPLATE:
-    filters = column(select_filter, name="filters", sizing_mode= "stretch_both")
-    locaties = column(select_locations, name="locaties", sizing_mode= "stretch_both")
-    parameters = column(select_parameters, name="parameters", sizing_mode= "stretch_both")
-    start_datepicker = column(search_start_date_picker, name="start_datepicker", sizing_mode= "stretch_both")
-    end_datepicker = column(search_end_date_picker, name="end_datepicker", sizing_mode= "stretch_both")
-    search_button = column(search_button, name="search_button", sizing_mode= "stretch_both")
-    zoektijdserie = column(select_search_timeseries, name="zoektijdserie", sizing_mode= "stretch_both")
-    kaart = column(map_fig,name="kaart",sizing_mode="stretch_both")
-    grafiek = column(time_figs, name = "grafiek", sizing_mode="stretch_both")
-    lr_fig = column(search_fig,name="grafiek_lr",sizing_mode="stretch_both")
-    slider = column(period_slider,name="slider",sizing_mode="stretch_both")
-    
-    curdoc().add_root(filters)
-    curdoc().add_root(locaties)
-    curdoc().add_root(parameters)
-    curdoc().add_root(start_datepicker)
-    curdoc().add_root(end_datepicker)
-    curdoc().add_root(search_button)  
-    curdoc().add_root(zoektijdserie)
-    curdoc().add_root(kaart)
-    curdoc().add_root(grafiek)
-    curdoc().add_root(lr_fig)
-    curdoc().add_root(slider)
 
-else:
-    select_locations.size = 10
-    map_fig.sizing_mode = "stretch_both"
-    map_panel = Panel(child=map_fig, title="kaart", name="kaart")
-    search_fig.width = int(width * 0.75)
-    search_fig.height = int(height * 0.15 * 0.75)
-    period_slider.width = int(width * 0.75 - 80)
-    period_slider.align = "center"
+select_locations.size = 10
+map_fig.sizing_mode = "stretch_both"
+map_panel = Panel(child=map_fig, title="kaart", name="kaart")
+search_fig.width = int(width * 0.75)
+search_fig.height = int(height * 0.15 * 0.75)
+period_slider.width = int(width * 0.75 - 80)
+period_slider.align = "end"
 
-    time_col = _create_time_col(time_figs)
+time_col = _create_time_col(time_figs)
 
-    time_col.align = 'end'
+time_panel = Panel(child=time_col,
+                   title="grafiek",
+                   name="grafiek")
+tabs = Tabs(tabs=[map_panel, time_panel],
+            name="tabs")
 
-    time_panel = Panel(child=time_col,
-                       title="grafiek",
-                       name="grafiek")
-    tabs = Tabs(tabs=[map_panel, time_panel],
-                name="tabs")
+#    search_start_date_picker.width = int(width * 0.08)
+#    search_end_date_picker.width = int(width * 0.08)
+#    search_button.width = int(width * 0.2)
+search_start_date_picker.sizing_mode = "stretch_both"
+search_end_date_picker.sizing_mode = "stretch_both"
+search_button.sizing_mode = "stretch_width"
+search_period_control = column(row(
+    search_start_date_picker,
+    search_end_date_picker),
+    search_button)
 
-    search_start_date_picker.sizing_mode = "stretch_both"
-    search_end_date_picker.sizing_mode = "stretch_both"
-    search_button.sizing_mode = "stretch_width"
-    search_period_control = column(row(
-        search_start_date_picker,
-        search_end_date_picker),
-        search_button)
+search_period_control.width = int(width * 0.2)
+controls = column(select_filter,
+                  select_locations,
+                  select_parameters,
+                  search_period_control,
+                  select_search_timeseries)
+controls.height = int(height * 0.75 - 80)
+layout = row(controls, tabs)
 
-    search_period_control.width = int(width * 0.2)
-    controls = column(div,
-                      select_filter,
-                      select_locations,
-                      select_parameters,
-                      search_period_control,
-                      select_search_timeseries)
-    controls.height = int(height * 0.75 - 80)
-    layout = row(controls, tabs)
-
-    curdoc().add_root(layout)
-    curdoc().title = TITLE
+curdoc().add_root(layout)
+curdoc().title = TITLE
