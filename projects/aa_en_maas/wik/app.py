@@ -1,5 +1,6 @@
 
 from server_config import BOKEH_URL, WIK_URL
+from config import TITLE
 from flask import Flask, render_template, render_template_string, request, redirect, session
 from user_config import valid_user, valid_password
 from bokeh.embed import server_session
@@ -32,7 +33,7 @@ app_template.write_text(
         <meta http-equiv="X-UA-Compatible" content="ie=edge">    
         <link rel="stylesheet" href="{{{{url_for('static',filename='css/plot_style.css')}}}}"> 
         <script type="text/javascript" src={{{{cdn_js | safe}}}}></script>
-        <title>Bokeh Plot</title>
+        <title>{TITLE}</title>
     </head>
     
     <body>
@@ -54,18 +55,18 @@ def login():
         user_pswrd = request.form.get("upassword")
         if valid_user(user_name) and valid_password(user_pswrd):
             session['auth'] = 1
-            return redirect(f'{WIK_URL}/wik')
+            return redirect(f'{WIK_URL}')
         else:
             session['auth'] = 0
     elif session.get('auth'):
-         return redirect(f'{WIK_URL}/wik')
+         return redirect(f'{WIK_URL}')
         
     return render_template("login.html")
 
 
  # pull a new session from a running Bokeh server
 
-@app.route('/wik')
+@app.route('/')
 def wik():
     """App route for wik application."""
     if 'auth' in session.keys():
@@ -90,5 +91,5 @@ def logout():
 
 if __name__ == "__main__":
  #    app.run(debug=True)
-     app = WSGIServer(('127.0.0.1', 5000), app.wsgi_app)
+     app = WSGIServer(('0.0.0.0', 5000), app.wsgi_app)
      app.serve_forever()

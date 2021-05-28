@@ -156,6 +156,7 @@ class Api:
         self.timer.reset()
         response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         self.timer.report("Locations request")
+        gdf = gpd.GeoDataFrame()
         if response.status_code == 200:
             gdf = gpd.GeoDataFrame(response.json()["locations"])
             gdf["geometry"] = gdf.apply(
@@ -198,7 +199,8 @@ class Api:
         thinning=None,
         onlyHeaders=False,
         unreliables=False,
-        showStatistics=False
+        showStatistics=False,
+        buffer=None
     ):
         """Get timeseries within a filter, optionally filtered by other variables."""
         result = None
@@ -209,6 +211,17 @@ class Api:
             for key, value in locals().items()
             if value and (key in _REQUEST_PARAMETERS_ALLOWED["timeseries"])
         }
+
+        #apply buffer (if supplied):
+        if buffer:
+            time_delta = pd.Timestamp(endTime) - pd.Timestamp(startTime)
+            buffer_delta = time_delta * buffer
+            parameters["startTime"] = (
+                pd.Timestamp(startTime) - buffer_delta
+                ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            parameters["endTime"] = (
+                pd.Timestamp(endTime) + buffer_delta
+                ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         parameters.update({"documentFormat": self.document_format})
         self.timer.reset()

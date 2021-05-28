@@ -25,3 +25,8 @@ projects/aa_en_maas/wik/scripts/slider.py
 projects/aa_en_maas/static/*
 projects/log/*
 projects/aa_en_maas/wik/user_config.py
+projects/aa_en_maas/Apache24/*
+projects/aa_en_maas/nssm.exe
+projects/aa_en_maas/serve_bokeh.bat
+projects/aa_en_maas/serve_bokeh.bat
+projects/aa_en_maas/serve_flask.bat
