@@ -278,6 +278,7 @@ class Data(object):
             self.options = []
             self.selected_ids = []
             self.selected_names = []
+            self.source = ColumnDataSource()
             self.pluvial = ColumnDataSource("x", "y", data={"x": [], "y": []})
             self.other = ColumnDataSource("x", "y", data={"x": [], "y": []})
 
@@ -292,7 +293,9 @@ class Data(object):
                                             "locationId",
                                             "shortName",
                                             "parentLocationId",
-                                            "type"])
+                                            "type",
+                                            "color",
+                                            "label"])
             for item in values:
                 # if not yet collected, get locations
                 if not item in self.sets.keys():
@@ -301,6 +304,9 @@ class Data(object):
                         item for item in self.sets[item].columns if item not in self.df.columns
                         ]
                     self.sets[item].drop(drop_cols, axis=1, inplace=True)
+                    #ToDo: varieren in kleur en naam ipv ident
+                    self.sets[item]["color"] = "blue"
+                    self.sets[item]["label"] = item
                 # add locations to df
                 self.df = self.df.append(self.sets[item])
 
@@ -315,7 +321,10 @@ class Data(object):
             self.df["type"] = "overig"
             self.df.loc[self.df["locationId"].str.match(
                 "[A-Z]{3}-[A-Z]{3}-[A-Z]{3}"), "type"] = "neerslag"
+            cds = ColumnDataSource(self.df)
             
+            self.source.data.update(cds.data)
+
             self.pluvial.data.update(
                 ColumnDataSource(
                     "x", "y", data=self.df.loc[self.df["type"] == "neerslag"]
@@ -372,8 +381,8 @@ class Data(object):
                                             "parameterType",
                                             "unit",
                                             "displayUnit",
-                                            "usersDatum",
-                                            "ParameterGroup"])
+                                            "usesDatum",
+                                            "parameterGroup"])
 
             for item in values:
                 # if not yet collected, get parameters
@@ -383,16 +392,17 @@ class Data(object):
                         item for item in self.sets[item].columns if item not in self.df.columns
                         ]
                     self.sets[item].drop(drop_cols, axis=1, inplace=True)
-                # add locations to df
+                    self.sets[item] = self.sets[item][~self.sets[item].index.isin(EXCLUDE_PARS)]
+                # add parameters from set to df
                 self.df = self.df.append(self.sets[item])
 
             # sort dataframe remove duplicates and build options
             self.df.sort_values(by="name", inplace=True, key=lambda x: x.str.lower())
-            self.df = self.df[self.df.index.duplicated(keep='first')]
+            self.df = self.df[~self.df.index.duplicated(keep='first')]
             self.options = list(zip(self.df.index, self.df["name"]))
-            #self.ids = self.df.index.to_list()
-            #self.names = self.df["name"].to_list()
-            #self.groups = self.df["parameterGroup"].to_list()
+            self.ids = self.df.index.to_list()
+            self.names = self.df["name"].to_list()
+            self.groups = self.df["parameterGroup"].to_list()
 
         def update(self, parameter_ids):
             """Update ids and names selected."""

@@ -190,7 +190,8 @@ def update_on_filter_select(attrname, old, new):
     
     #set locations options
     select_locations.options = data.locations.options
-    
+    select_parameters.options = data.parameters.options
+
     # # clean filters
     # _clean_filters()
 
@@ -367,6 +368,7 @@ os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
 data = Data(FILTER_SELECTED, logger)
 
 # %% define map figure widget and handlers
+#ToDo: data.locations.source toevoegen
 map_glyphs = [
     {
         "type": "inverted_triangle",
