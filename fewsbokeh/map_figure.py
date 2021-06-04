@@ -25,8 +25,8 @@ def generate(width=None,
                       end=bounds[3],
                       bounds=None)
 
-    map_hover = HoverTool(tooltips=[("shortName", "@shortName"),
-                                    ("locationId", "@locationId")
+    map_hover = HoverTool(tooltips=[("Locatie", "@shortName"),
+                                    ("ID", "@locationId")
                                     ])
 
     tools = ["wheel_zoom", "pan", "reset", map_hover]

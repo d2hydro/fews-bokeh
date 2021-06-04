@@ -2,13 +2,15 @@
 from server_config import FEWS_URL, NOW, SSL_VERIFY, BUFFER
 
 from config import (
-    MAP_BUFFER,
     BOUNDS,
     FILTER_PARENT,
+    FILTER_API,
     EXCLUDE_PARS,
     SEARCH_YEARS,
     FILTER_MONTHS,
     TIMESERIES_DAYS,
+    FILTER_RELATIONS,
+    FILTER_COLORS
 )
 
 from itertools import cycle
@@ -20,7 +22,6 @@ from fewsbokeh.sources import fews_rest
 from fewsbokeh.time import Timer
 from shapely.geometry import Point
 from typing import List
-from operator import itemgetter
 
 from bokeh.palettes import Category10_10 as palette
 import ctypes
@@ -39,24 +40,28 @@ def _screen_resolution():
 width, height = _screen_resolution()
 
 
+def _flatten_relations(x, relations):
+    return [i["relatedLocationId"] for i in x["relations"] if i["id"] in relations]
+
 class Data(object):
     """Data-object with dataframes and update methods."""
 
-    def __init__(self, filterId, logger):
+    def __init__(self, logger):
+        """Initialize data-class."""
         self.logger = logger
         self.timer = Timer(logger)
         self.now = NOW
         self.start_datetime = self.now - pd.DateOffset(days=TIMESERIES_DAYS)
         self.first_value_datetime = self.now - pd.DateOffset(years=SEARCH_YEARS)
         self.search_start_datetime = self.now - pd.DateOffset(months=FILTER_MONTHS)
-        self.fews_api = fews_rest.Api(FEWS_URL, logger, filterId, SSL_VERIFY)
+        self.fews_api = fews_rest.Api(FEWS_URL, logger, FILTER_API, SSL_VERIFY)
         self.timer.report("FEWS-API initiated")
-        self.filters = self.Filters(filterId, self.fews_api, logger)
+        self.filters = self.Filters(self.fews_api, logger)
         self.timer.report("filters initiated")
-        self.locations = self.Locations(filterId, self.fews_api, logger)
+        self.locations = self.Locations(self.fews_api, logger)
         self.timer.report("locations initiated")
         self.parameters = self.Parameters(
-            filterId, self.fews_api, logger, locationIds=[], exclude=EXCLUDE_PARS
+            self.fews_api, logger, locationIds=[], exclude=EXCLUDE_PARS
         )
         self.timer.report("parameters initiated")
         self.timeseries = self.TimeSeries(
@@ -66,6 +71,7 @@ class Data(object):
             self.start_datetime,
             self.search_start_datetime,
         )
+
         self.timer.reset("init finished")
 
     def include_child_locations(self, location_ids):
@@ -78,7 +84,9 @@ class Data(object):
 
     def update_filter_select(self, values):
         """Update datamodel on selected filter."""
-        self.locations.fetch(values)
+        print(values)
+        tuple_values = self.filters.get_tuples(values)
+        self.locations.fetch(tuple_values)
         self.parameters.fetch(values)
 
     def update_locations_select(self, location_names):
@@ -100,10 +108,6 @@ class Data(object):
                     list(set([item["parameterId"] for item in headers]))
                 )
 
-    def update_parameters_select(self, parameter_names):
-        """Update datamodel on selected locations."""
-        parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
-
     def update_map_tab(self, x, y, distance_threshold):
         """Update datamodel when map user tabs."""
         gdf = gpd.GeoDataFrame(self.locations.df)
@@ -116,20 +120,17 @@ class Data(object):
 
         self.locations._update_selected(location_ids)
 
-    def create_timeseries(self, location_names, parameter_names):
+    def create_timeseries(self, location_ids, parameter_ids):
         """Update timeseries."""
-
-        # some variables for later use
-        self.timeseries.title = ",".join(location_names)
-
-        # get parameter and location ids
-        location_ids = self.locations._to_ids(location_names)
+        location_names = self.locations._to_names(location_ids)
         location_ids = self.include_child_locations(location_ids)
-        parameter_ids = self.fews_api.to_parameter_ids(parameter_names)
+        self.timeseries.title = ",".join(location_names)
 
         parameter_groups = self.fews_api.parameters.loc[parameter_ids][
             "parameterGroup"
         ].to_list()
+
+        # print(parameter_groups)
 
         self.timeseries.create(
             location_ids, parameter_ids, self.filters.selected["id"], parameter_groups
@@ -234,23 +235,25 @@ class Data(object):
     class Filters(object):
         """Available filters."""
 
-        def __init__(self, filterId, fews_api, logger):
+        def __init__(self, fews_api, logger):
+            """Initialize filters."""
             filters = fews_api.get_filters(filterId=FILTER_PARENT)[FILTER_PARENT][
                 "child"
             ]
             self.names = [item["name"] for item in filters]
             self.filters = list()
+            self.selected = {"id": FILTER_PARENT}
 
             # populate filters
             self.update(filters)
-            
-        
+
         class Subfilter(object):
+            """Subfilter class for defining specs."""
+
             ident: str
             name: str
             options: List[tuple]
             value: list = []
-            
 
         def update(self, filters):
             """Update subfilters."""
@@ -259,15 +262,22 @@ class Data(object):
                     subfilter = self.Subfilter()
                     subfilter.ident = item["id"]
                     subfilter.name = item["name"]
-                    subfilter.options = [
-                        (i["id"], i["name"]) for i in item["child"]
-                        ]
+                    subfilter.options = [(i["id"], i["name"]) for i in item["child"]]
                     self.filters += [subfilter]
+
+        def get_tuples(self, filter_ids):
+            """Return (id, name) tuples for filter_ids."""
+            filter_options = [i.options for i in self.filters]
+            filter_options = [i for sublist in filter_options for i in sublist]
+            
+            return [i for i in filter_options if i[0] in filter_ids]
+     
 
     class Locations(object):
         """Available locations."""
 
-        def __init__(self, filterId, fews_api, logger):
+        def __init__(self, fews_api, logger):
+            """Initialize locations."""
             self.fews_api = fews_api
             self.logger = logger
             self.sets = {}
@@ -284,45 +294,82 @@ class Data(object):
 
             self.selected = ColumnDataSource("x", "y", data={"x": [], "y": []})
 
-            #self.fetch(filterId)
-            
+            # self.fetch(filterId)
+
         def fetch(self, values):
+            """Fetch locations_set from filters (values)."""
             self.options = []
-            self.df = pd.DataFrame(columns=["x",
-                                            "y",
-                                            "locationId",
-                                            "shortName",
-                                            "parentLocationId",
-                                            "type",
-                                            "color",
-                                            "label"])
-            for item in values:
+            self.df = pd.DataFrame(
+                columns=[
+                    "x",
+                    "y",
+                    "locationId",
+                    "shortName",
+                    "parentLocationId",
+                    "type",
+                    "color",
+                    "label",
+                ]
+            )
+            print(values)
+            for filter_id, filter_name in values:
                 # if not yet collected, get locations
-                if not item in self.sets.keys():
-                    self.sets[item] = self.fews_api.get_locations(filterId=item)
+                if filter_id not in self.sets.keys():
+                    self.sets[filter_id] = self.fews_api.get_locations(
+                        filterId=filter_id,
+                        includeLocationRelations=True
+                        )
+                    # filter related locations
+                    if filter_id in FILTER_RELATIONS.keys():
+                        relations = FILTER_RELATIONS[filter_id]
+                        drop_idx = list(
+                            set(
+                                self.sets[filter_id].apply(
+                                    _flatten_relations,
+                                    args=(relations,),
+                                    axis=1).explode().to_list()
+                                )
+                            )
+                        self.sets[filter_id] = self.sets[filter_id].loc[
+                            ~self.sets[filter_id]["locationId"].isin(drop_idx)
+                            ]
+
+                    # drop all unwanted columns
                     drop_cols = [
-                        item for item in self.sets[item].columns if item not in self.df.columns
-                        ]
-                    self.sets[item].drop(drop_cols, axis=1, inplace=True)
-                    #ToDo: varieren in kleur en naam ipv ident
-                    self.sets[item]["color"] = "blue"
-                    self.sets[item]["label"] = item
+                        filter_id
+                        for filter_id in self.sets[filter_id].columns
+                        if filter_id not in self.df.columns
+                    ]
+                    self.sets[filter_id].drop(drop_cols, axis=1, inplace=True)
+                    if filter_id in FILTER_COLORS.keys():
+                        line_color = FILTER_COLORS[filter_id]["line"]
+                        fill_color = FILTER_COLORS[filter_id]["fill"]
+                    else:
+                        line_color = "orange"
+                        fill_color = "black"
+
+                    self.sets[filter_id]["line_color"] = line_color
+                    self.sets[filter_id]["fill_color"] = fill_color
+                    self.sets[filter_id]["label"] = filter_name
                 # add locations to df
-                self.df = self.df.append(self.sets[item])
+                self.df = self.df.append(self.sets[filter_id])
 
             # sort dataframe remove duplicates and build options
             self.df = self.df.loc[self.df["parentLocationId"].isna()]
-            self.df.sort_values(by="shortName", inplace=True, key=lambda x: x.str.lower())
+            self.df.sort_values(
+                by="shortName", inplace=True, key=lambda x: x.str.lower()
+            )
             self.df.drop_duplicates(subset=["locationId"], inplace=True)
             self.df.reset_index(drop=True, inplace=True)
             self.options = list(zip(self.df["locationId"], self.df["shortName"]))
-             
+
             # fill columndatasource
             self.df["type"] = "overig"
-            self.df.loc[self.df["locationId"].str.match(
-                "[A-Z]{3}-[A-Z]{3}-[A-Z]{3}"), "type"] = "neerslag"
+            self.df.loc[
+                self.df["locationId"].str.match("[A-Z]{3}-[A-Z]{3}-[A-Z]{3}"), "type"
+            ] = "neerslag"
             cds = ColumnDataSource(self.df)
-            
+
             self.source.data.update(cds.data)
 
             self.pluvial.data.update(
@@ -336,8 +383,7 @@ class Data(object):
                     "x", "y", data=self.df.loc[self.df["type"] == "overig"]
                 ).data
             )
-                    
-                
+
         def _update_selected(self, location_ids):
             x = self.df.loc[self.df["locationId"].isin(location_ids)].x.to_list()
             y = self.df.loc[self.df["locationId"].isin(location_ids)].y.to_list()
@@ -358,10 +404,22 @@ class Data(object):
                     self.fews_api.locations["shortName"] == location_names
                 ]["locationId"]
 
+        def _to_names(self, location_ids):
+            """Convert a list of location ids to names."""
+            if isinstance(location_ids, list):
+                return self.fews_api.locations.loc[
+                    self.fews_api.locations["locationId"].isin(location_ids)
+                ]["shortName"].to_list()
+            else:
+                return self.fews_api.locations.loc[
+                    self.fews_api.locations["locationId"] == location_ids
+                ]["shortName"]
+
     class Parameters(object):
         """Available parameters."""
 
-        def __init__(self, filterId, fews_api, logger, locationIds, exclude=[]):
+        def __init__(self, fews_api, logger, locationIds, exclude=[]):
+            """Initialize parameters."""
             self.fews_api = fews_api
             self.logger = logger
             self.groups = None
@@ -372,33 +430,40 @@ class Data(object):
             self.names = []
             self.search_parameter = None
             self.exclude = exclude
-            # self.fetch(fews_api._get_parameters(filterId))
 
         def fetch(self, values):
             """Fetch new parameters filterId."""
             self.options = []
-            self.df = pd.DataFrame(columns=["name",
-                                            "parameterType",
-                                            "unit",
-                                            "displayUnit",
-                                            "usesDatum",
-                                            "parameterGroup"])
+            self.df = pd.DataFrame(
+                columns=[
+                    "name",
+                    "parameterType",
+                    "unit",
+                    "displayUnit",
+                    "usesDatum",
+                    "parameterGroup",
+                ]
+            )
 
             for item in values:
                 # if not yet collected, get parameters
-                if not item in self.sets.keys():    
-                    self.sets[item] = self.fews_api._get_parameters(filterId=item)
+                if item not in self.sets.keys():
+                    self.sets[item] = self.fews_api.get_parameters(filterId=item)
                     drop_cols = [
-                        item for item in self.sets[item].columns if item not in self.df.columns
-                        ]
+                        item
+                        for item in self.sets[item].columns
+                        if item not in self.df.columns
+                    ]
                     self.sets[item].drop(drop_cols, axis=1, inplace=True)
-                    self.sets[item] = self.sets[item][~self.sets[item].index.isin(EXCLUDE_PARS)]
+                    self.sets[item] = self.sets[item][
+                        ~self.sets[item].index.isin(EXCLUDE_PARS)
+                    ]
                 # add parameters from set to df
                 self.df = self.df.append(self.sets[item])
 
             # sort dataframe remove duplicates and build options
             self.df.sort_values(by="name", inplace=True, key=lambda x: x.str.lower())
-            self.df = self.df[~self.df.index.duplicated(keep='first')]
+            self.df = self.df[~self.df.index.duplicated(keep="first")]
             self.options = list(zip(self.df.index, self.df["name"]))
             self.ids = self.df.index.to_list()
             self.names = self.df["name"].to_list()
@@ -418,6 +483,7 @@ class Data(object):
         def __init__(
             self, fews_api, logger, now, start_datetime, search_start_datetime
         ):
+            """Initialize timeseries."""
             self.hr_data = None
             self.lr_data = pd.DataFrame({"datetime": [], "value": []})
             self.lr_src = ColumnDataSource(self.lr_data)
@@ -428,7 +494,7 @@ class Data(object):
             self.search_end_datetime = now
             self.search_start_datetime = search_start_datetime
             self.time_zone = None
-            self.timeseries = None
+            self.timeseries = None  # contains timeseries specs and source
             self.headers = None
             self.title = None
             self.hr_graphs = None
@@ -437,6 +503,21 @@ class Data(object):
             self.lr_y_range = Range1d(start=-0.1, end=0.1, bounds=None)
             self.hr_glyphs = None
             self.lr_glyph = {"type": "line", "color": palette[0], "source": self.lr_src}
+
+            self._init_timeseries()
+
+        def _init_timeseries(self):
+            self.timeseries = pd.DataFrame(
+                columns=[
+                    "location_id",
+                    "location_name",
+                    "parameter_id",
+                    "parameter_name",
+                    "parameter_group",
+                    "source",
+                    "label",
+                ]
+            )
 
         def get_lr_data(
             self,
@@ -471,9 +552,11 @@ class Data(object):
             # print(location_ids, parameter_ids, filter_id, parameter_groups)
             """Update timeseries data."""
             # high resolution data
+            self._init_timeseries()  # create an empty dataframe with ts specs
             timespan = (self.end_datetime - self.start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
-            self.time_zone, self.hr_data = self.fews_api.get_timeseries(
+            # print(location_ids, parameter_ids, filter_id, parameter_groups)
+            result = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
                 parameterIds=parameter_ids,
@@ -484,111 +567,115 @@ class Data(object):
                 buffer=BUFFER,
             )
 
-            # initalize results
-            self.hr_glyphs = {group: [] for group in parameter_groups}
-            self.hr_graphs = {
-                group: {
-                    "x_bounds": {
-                        "start": self.start_datetime,
-                        "end": self.end_datetime,
-                    },
-                    "y_bounds": {"start": [], "end": []},
+            if result is not None:
+                self.time_zone, self.hr_data = result
+
+                # initalize results
+                self.hr_glyphs = {group: [] for group in parameter_groups}
+                self.hr_graphs = {
+                    group: {
+                        "x_bounds": {
+                            "start": self.start_datetime,
+                            "end": self.end_datetime,
+                        },
+                        "y_bounds": {"start": [], "end": []},
+                    }
+                    for group in parameter_groups
                 }
-                for group in parameter_groups
-            }
 
-            timeseries = []
-            colors = cycle(palette)
-            # x_bounds = {'start': [], 'end': []}
-            for ts in self.hr_data:
-                if "header" in ts.keys():
-                    header = ts["header"]
-                    group = self.fews_api.parameters.loc[header["parameterId"]][
-                        "parameterGroup"
-                    ]
-                    color = next(colors)
-                    short_name = self.fews_api.locations.loc[header["locationId"]][
-                        "shortName"
-                    ]
-                    parameter_name = self.fews_api.parameters.loc[
-                        header["parameterId"]
-                    ]["name"]
-                    ts_specs = {
-                        "location_id": header["locationId"],
-                        "location_name": short_name,
-                        "parameter_id": header["parameterId"],
-                        "parameter_name": parameter_name,
-                        "parameter_group": group,
-                    }
-                if "events" in ts.keys():
-                    if not ts["events"].empty:
-                        source = ColumnDataSource(ts["events"])
-                        self.hr_graphs[group]["y_bounds"]["start"] += [
-                            ts["events"]["value"].min()
+                timeseries = []
+                colors = cycle(palette)
+                # x_bounds = {'start': [], 'end': []}
+                for ts in self.hr_data:
+                    if "header" in ts.keys():
+                        header = ts["header"]
+                        group = self.fews_api.parameters.loc[header["parameterId"]][
+                            "parameterGroup"
                         ]
-                        self.hr_graphs[group]["y_bounds"]["end"] += [
-                            ts["events"]["value"].max()
+                        color = next(colors)
+                        short_name = self.fews_api.locations.loc[header["locationId"]][
+                            "shortName"
                         ]
-                else:
-                    source = ColumnDataSource({"datetime": [], "value": []})
-
-                ts_specs["source"] = source
-
-                timeseries += [ts_specs]
-                self.hr_glyphs[group] += [
-                    {
-                        "type": "line",
-                        "color": color,
-                        "source": source,
-                        "legend_label": f"{short_name} {parameter_name}",
-                    }
-                ]
-
-            self.timeseries = pd.DataFrame(timeseries)
-            if not self.timeseries.empty:
-                self.timeseries["label"] = self.timeseries.apply(
-                    (lambda x: f"{x['location_name']} ({x['parameter_name']})"), axis=1
-                )
-                self.timeseries.set_index(
-                    ["location_id", "parameter_id"], inplace=True, drop=False
-                )
-                self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
-                    int(float(self.time_zone))
-                )
-
-                # if len(x_bounds['start']) > 0:
-                #     x_bounds['start'] = min(x_bounds['start'])
-                # else:
-                #     x_bounds['start'] = self.start_datetime
-
-                # if len(x_bounds['end']) > 0:
-                #     x_bounds['end'] = max(x_bounds['end'])
-                # else:
-                #     x_bounds['end'] = self.end_datetime
-
-                # self.x_bounds = x_bounds
-                for group in self.hr_glyphs.keys():
-                    if len(self.hr_graphs[group]["y_bounds"]["start"]) > 0:
-                        self.hr_graphs[group]["y_bounds"]["start"] = min(
-                            self.hr_graphs[group]["y_bounds"]["start"]
-                        )
+                        parameter_name = self.fews_api.parameters.loc[
+                            header["parameterId"]
+                        ]["name"]
+                        ts_specs = {
+                            "location_id": header["locationId"],
+                            "location_name": short_name,
+                            "parameter_id": header["parameterId"],
+                            "parameter_name": parameter_name,
+                            "parameter_group": group,
+                        }
+                    if "events" in ts.keys():
+                        if not ts["events"].empty:
+                            source = ColumnDataSource(ts["events"])
+                            self.hr_graphs[group]["y_bounds"]["start"] += [
+                                ts["events"]["value"].min()
+                            ]
+                            self.hr_graphs[group]["y_bounds"]["end"] += [
+                                ts["events"]["value"].max()
+                            ]
                     else:
-                        self.hr_graphs[group]["y_bounds"]["start"] = 0
+                        source = ColumnDataSource({"datetime": [], "value": []})
 
-                    if len(self.hr_graphs[group]["y_bounds"]["end"]) > 0:
-                        self.hr_graphs[group]["y_bounds"]["end"] = max(
-                            self.hr_graphs[group]["y_bounds"]["end"]
-                        )
-                    else:
-                        self.hr_graphs[group]["y_bounds"]["end"] = 1
-                    if (
-                        self.hr_graphs[group]["y_bounds"]["end"]
-                        == self.hr_graphs[group]["y_bounds"]["start"]
-                    ):
-                        self.hr_graphs[group]["y_bounds"]["end"] += 0.1
-                        self.hr_graphs[group]["y_bounds"]["start"] -= 0.1
-                    self.hr_graphs[group]["y_range"] = Range1d(
-                        start=self.hr_graphs[group]["y_bounds"]["start"],
-                        end=self.hr_graphs[group]["y_bounds"]["end"],
-                        bounds=None,
+                    ts_specs["source"] = source
+                    # print(ts_specs)
+                    timeseries += [ts_specs]
+                    self.hr_glyphs[group] += [
+                        {
+                            "type": "line",
+                            "color": color,
+                            "source": source,
+                            "legend_label": f"{short_name} {parameter_name}",
+                        }
+                    ]
+
+                self.timeseries = pd.DataFrame(timeseries)
+                if not self.timeseries.empty:
+                    self.timeseries["label"] = self.timeseries.apply(
+                        (lambda x: f"{x['location_name']} ({x['parameter_name']})"),
+                        axis=1,
                     )
+                    self.timeseries.set_index(
+                        ["location_id", "parameter_id"], inplace=True, drop=False
+                    )
+                    self.x_axis_label = "datum-tijd [gmt {0:+}]".format(
+                        int(float(self.time_zone))
+                    )
+
+                    # if len(x_bounds['start']) > 0:
+                    #     x_bounds['start'] = min(x_bounds['start'])
+                    # else:
+                    #     x_bounds['start'] = self.start_datetime
+
+                    # if len(x_bounds['end']) > 0:
+                    #     x_bounds['end'] = max(x_bounds['end'])
+                    # else:
+                    #     x_bounds['end'] = self.end_datetime
+
+                    # self.x_bounds = x_bounds
+                    for group in self.hr_glyphs.keys():
+                        if len(self.hr_graphs[group]["y_bounds"]["start"]) > 0:
+                            self.hr_graphs[group]["y_bounds"]["start"] = min(
+                                self.hr_graphs[group]["y_bounds"]["start"]
+                            )
+                        else:
+                            self.hr_graphs[group]["y_bounds"]["start"] = 0
+
+                        if len(self.hr_graphs[group]["y_bounds"]["end"]) > 0:
+                            self.hr_graphs[group]["y_bounds"]["end"] = max(
+                                self.hr_graphs[group]["y_bounds"]["end"]
+                            )
+                        else:
+                            self.hr_graphs[group]["y_bounds"]["end"] = 1
+                        if (
+                            self.hr_graphs[group]["y_bounds"]["end"]
+                            == self.hr_graphs[group]["y_bounds"]["start"]
+                        ):
+                            self.hr_graphs[group]["y_bounds"]["end"] += 0.1
+                            self.hr_graphs[group]["y_bounds"]["start"] -= 0.1
+                        self.hr_graphs[group]["y_range"] = Range1d(
+                            start=self.hr_graphs[group]["y_bounds"]["start"],
+                            end=self.hr_graphs[group]["y_bounds"]["end"],
+                            bounds=None,
+                        )

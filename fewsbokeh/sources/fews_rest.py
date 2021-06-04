@@ -45,20 +45,26 @@ class Api:
         self.timer = Timer(logger)
         self.ssl_verify = ssl_verify
         self._get_parameters(filterId)
+        self._get_locations(filterId)
 
     def _get_parameters(self, filterId):
+        self.parameters = self.get_parameters(filterId=filterId)
+    
+    def _get_locations(self, filterId):
+        self.locations = self.get_locations(filterId=filterId)
+        
+    def get_parameters(self, filterId):
         rest_url = f"{self.url}parameters"
         parameters = dict(filterId=filterId,
                           documentFormat=self.document_format)
         self.timer.reset()
         response = requests.get(rest_url, parameters, verify=self.ssl_verify)
-        print(response.url)
         self.timer.report("Parameters request")
+        print(response.url)
         if response.status_code == 200:
             if "timeSeriesParameters" in response.json().keys():
                 par_df = pd.DataFrame(response.json()["timeSeriesParameters"])
                 par_df.set_index("id", inplace=True)
-                self.parameters = par_df
                 result = par_df
             else:
                 result = None
@@ -66,6 +72,8 @@ class Api:
         else:
             self.logger.error(f"FEWS Server responds {response.text}")
         return result
+        
+        
 
     def get_filters(self, filterId=None):
         """Get filters as dictionary, or sub-filters if a filterId is specified."""
@@ -144,7 +152,10 @@ class Api:
         """Convert parameterIds to parameterIds."""
         return self.parameters.loc[self.parameters["name"].isin(names)].index.to_list()
 
-    def get_locations(self, showAttributes=False, filterId=None):
+    def get_locations(self,
+                      showAttributes=False,
+                      filterId=None,
+                      includeLocationRelations=False):
         """Get location en return as a GeoDataFrame."""
         rest_url = f"{self.url}locations"
 
@@ -152,6 +163,7 @@ class Api:
             documentFormat=self.document_format,
             showAttributes=showAttributes,
             filterId=filterId,
+            includeLocationRelations=includeLocationRelations
         )
         self.timer.reset()
         response = requests.get(rest_url, parameters, verify=self.ssl_verify)
@@ -175,6 +187,7 @@ class Api:
                     "description",
                     "shortName",
                     "parentLocationId",
+                    "relations",
                     "x",
                     "y",
                     "geometry",
@@ -183,7 +196,7 @@ class Api:
             gdf = gdf.drop(drop_cols, axis=1)
             gdf.index = gdf["locationId"]
 
-            self.locations = gdf
+            # self.locations = gdf
             self.timer.report("Locations parsed")
         return gdf
 

@@ -1,5 +1,5 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from config import TITLE, LOG_LEVEL, FILTER_SELECTED, LOG_FILE
+from config import TITLE, LOG_LEVEL, LOG_FILE
 
 from server_config import BUFFER
 
@@ -69,9 +69,9 @@ def _datetime_offset(values, offset_years):
 
 def _clean_filters():
     # clean parameters filter
-    select_parameters.options = data.parameters.names
+    select_parameters.options = data.parameters.options
     parameters_select = [
-        val for val in select_parameters.value if val in data.parameters.names
+        val for val in select_parameters.value if val in data.parameters.ids
     ]
 
     select_parameters.value = parameters_select
@@ -93,10 +93,11 @@ def _create_timefig():
     """Create a time-fig."""
     if all([select_locations.value, select_parameters.value]):
         # print(select_locations.value, select_parameters.value)
+        # print(select_parameters.value)
         data.create_timeseries(select_locations.value, select_parameters.value)
 
         logger.debug("event: _create_time_fig")
-
+        # print(data.timeseries.timeseries)
         # update timeseries search select
         if not data.timeseries.timeseries.empty:
 
@@ -187,9 +188,10 @@ def update_on_filter_select(attrname, old, new):
     values = [item for sublist in values for item in sublist]
     # update subfilters with selected filters
     data.update_filter_select(values)
-    
-    #set locations options
+
+    # set locations options
     select_locations.options = data.locations.options
+    # print(data.parameters.options)
     select_parameters.options = data.parameters.options
 
     # # clean filters
@@ -365,28 +367,19 @@ logger.addHandler(fh)
 os.environ["BOKEH_ALLOW_WS_ORIGIN"] = "*"
 
 # %% define the data object
-data = Data(FILTER_SELECTED, logger)
+data = Data(logger)
 
 # %% define map figure widget and handlers
-#ToDo: data.locations.source toevoegen
+# ToDo: data.locations.source toevoegen
 map_glyphs = [
     {
-        "type": "inverted_triangle",
-        "size": 5,
-        "source": data.locations.pluvial,
-        "line_color": "blue",
-        "fill_color": "white",
+        "type": "circle",
+        "size": 3,
+        "source": data.locations.source,
+        "line_color": "line_color",
+        "fill_color": "fill_color",
         "line_width": 1,
-        "legend_label": "neerslag",
-    },
-    {
-        "type": "inverted_triangle",
-        "size": 5,
-        "source": data.locations.other,
-        "line_color": "orange",
-        "fill_color": "white",
-        "line_width": 1,
-        "legend_label": "overig",
+        "legend_field": "label",
     },
     {
         "type": "circle",
@@ -576,7 +569,7 @@ controls = column(filters + [select_locations,
                              search_period_control,
                              select_search_timeseries]
                   )
-#controls.height = int(height * 0.75 - 80)
+# controls.height = int(height * 0.75 - 80)
 layout = row(controls, tabs)
 
 curdoc().add_root(layout)
