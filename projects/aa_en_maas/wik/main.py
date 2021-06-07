@@ -1,5 +1,5 @@
 """Bokeh FEWS-REST dashboard for WIK Aa en Maas."""
-from config import TITLE, LOG_LEVEL, LOG_FILE
+from config import TITLE, LOG_LEVEL, LOG_FILE, TILE_SOURCES
 
 from server_config import BUFFER
 
@@ -18,7 +18,7 @@ from bokeh.models.widgets import (
     DatePicker,
     DateRangeSlider,
 )
-from bokeh.models import ColumnDataSource, Range1d
+from bokeh.models import ColumnDataSource, Range1d, RadioGroup, CheckboxGroup, Div
 from bokeh.layouts import row, column
 import ctypes
 import numpy as np
@@ -177,6 +177,8 @@ def update_on_tap(event):
     data.update_map_tab(x, y, distance_threshold)
 
     # update locations filter
+    
+    # Neeltje, hier selected_locations.values zijn de locationIds die geselecteerd worden op de kaart, niet de namen.
     select_locations.value = data.locations.selected_names
 
 
@@ -352,6 +354,11 @@ def update_search_fig():
     if search_series:
         data.update_lr_timeseries(search_series, start_datetime, end_datetime)
 
+def update_background(attrname, old, new):
+    """Update map_fig with new background."""
+    tile_source = map_figure.get_tileource(background.labels[new])
+    idx = next(idx for idx, i in enumerate(map_fig.renderers) if i.name == "background")
+    map_fig.renderers[idx].tile_source = tile_source
 
 log_dir = LOG_FILE.parent
 log_dir.mkdir(exist_ok=True)
@@ -374,7 +381,7 @@ data = Data(logger)
 map_glyphs = [
     {
         "type": "circle",
-        "size": 3,
+        "size": 12,
         "source": data.locations.source,
         "line_color": "line_color",
         "fill_color": "fill_color",
@@ -383,7 +390,7 @@ map_glyphs = [
     },
     {
         "type": "circle",
-        "size": 4,
+        "size": 13,
         "source": data.locations.selected,
         "fill_color": "red",
     },
@@ -392,11 +399,31 @@ map_glyphs = [
 map_fig = map_figure.generate(
     bounds=data.locations.bounds,
     glyphs=map_glyphs,
+    background="topografie",
+    map_layers={k: v for k, v in TILE_SOURCES.items() if v["active"]}
 )
 
 map_fig.name = "map_fig"
+
+# event to select locations on the map
 map_fig.on_event(events.Tap, update_on_tap)
+
+# event to deselect all selected locations
 map_fig.on_event(events.DoubleTap, update_on_double_tap)
+
+# %% define map-controls and handlers
+map_options = list(TILE_SOURCES.keys())
+map_active = [idx for idx, v in enumerate(TILE_SOURCES.values()) if v["active"]]
+map_layers = CheckboxGroup(labels=map_options, active=map_active)
+
+background = RadioGroup(labels=["topografie", "luchtfoto"], active=0)
+
+background.on_change("active", update_background)
+
+map_controls = column(Div(text="<b>Kaartopties</b><br><br>Kaartlagen"),
+                      map_layers,
+                      Div(text="Achtergrond"),
+                      background)
 
 # %% define main filter selection and handlers
 filters = list()
@@ -451,7 +478,7 @@ search_button.on_click(update_search_fig)
 select_search_timeseries = Select(title="Zoektijdserie:", value=None, options=[])
 select_search_timeseries.on_change("value", update_on_search_select)
 
-# %% define empty time_figs
+# %% define empty time_figs and fig-handlers
 centre_datetime = (
     data.timeseries.start_datetime
     + (data.timeseries.end_datetime - data.timeseries.start_datetime) / 2
@@ -544,8 +571,13 @@ height = 1080 * 0.82
 
 
 select_locations.size = 10
-map_fig.sizing_mode = "stretch_both"
-map_panel = Panel(child=map_fig, title="kaart", name="kaart")
+#map_fig.sizing_mode = "stretch_width"
+map_fig.height = int(height * 0.85)
+map_fig.width = int(width * 0.85)
+map_controls.sizing_mode = "stretch_both"
+map_panel = Panel(child=row(map_fig,map_controls),
+                  title="kaart",
+                  name="kaart")
 search_fig.width = int(width * 0.75)
 search_fig.height = int(height * 0.15 * 0.75)
 period_slider.width = int(width * 0.75 - 80)

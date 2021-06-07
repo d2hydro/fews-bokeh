@@ -84,7 +84,7 @@ class Data(object):
 
     def update_filter_select(self, values):
         """Update datamodel on selected filter."""
-        print(values)
+        #print(values)
         tuple_values = self.filters.get_tuples(values)
         self.locations.fetch(tuple_values)
         self.parameters.fetch(values)
@@ -288,17 +288,15 @@ class Data(object):
             self.options = []
             self.selected_ids = []
             self.selected_names = []
-            self.source = ColumnDataSource()
-            self.pluvial = ColumnDataSource("x", "y", data={"x": [], "y": []})
-            self.other = ColumnDataSource("x", "y", data={"x": [], "y": []})
 
+            self._init_df()
+
+            self.source = ColumnDataSource(self.df)
             self.selected = ColumnDataSource("x", "y", data={"x": [], "y": []})
 
             # self.fetch(filterId)
 
-        def fetch(self, values):
-            """Fetch locations_set from filters (values)."""
-            self.options = []
+        def _init_df(self):
             self.df = pd.DataFrame(
                 columns=[
                     "x",
@@ -307,11 +305,17 @@ class Data(object):
                     "shortName",
                     "parentLocationId",
                     "type",
-                    "color",
+                    "line_color",
+                    "fill_color",
                     "label",
                 ]
             )
-            print(values)
+
+        def fetch(self, values):
+            """Fetch locations_set from filters (values)."""
+            self.options = []
+            self._init_df()
+
             for filter_id, filter_name in values:
                 # if not yet collected, get locations
                 if filter_id not in self.sets.keys():
@@ -372,17 +376,6 @@ class Data(object):
 
             self.source.data.update(cds.data)
 
-            self.pluvial.data.update(
-                ColumnDataSource(
-                    "x", "y", data=self.df.loc[self.df["type"] == "neerslag"]
-                ).data
-            )
-
-            self.other.data.update(
-                ColumnDataSource(
-                    "x", "y", data=self.df.loc[self.df["type"] == "overig"]
-                ).data
-            )
 
         def _update_selected(self, location_ids):
             x = self.df.loc[self.df["locationId"].isin(location_ids)].x.to_list()
