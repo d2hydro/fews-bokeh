@@ -20,13 +20,17 @@ URLS = {"luchtfoto": {"url": ("https://geodata.nationaalgeoregister.nl/luchtfoto
                "class": WMTSTileSource}
         }
 
-def get_tileource(background, urls=URLS):
-    if background == "background":
+def get_tileource(layer, urls=URLS):
+    if layer == "background":
         return get_provider(Vendors.CARTODBPOSITRON)
-    elif background in urls.keys():
-        url = urls[background]["url"]
-        return urls[background]["class"](url=url)   
-    
+    elif layer in urls.keys():
+        url = urls[layer]["url"]
+        if "args" in urls[layer]:
+            args = urls[layer]["args"]
+        else:
+            args = {}
+        return urls[layer]["class"](url=url, **args)   
+
 def generate(width=None,
              height=None,
              bounds=None,
@@ -69,7 +73,9 @@ def generate(width=None,
         layer_names.reverse()
         for layer_name in layer_names:
             tile_source = get_tileource(layer_name, urls=map_layers)
-            map_fig.add_tile(tile_source, name=layer_name)
+            map_fig.add_tile(tile_source,
+                             name=layer_name,
+                             visible=map_layers[layer_name]["visible"])
 
     if glyphs:
         for glyph in glyphs:

@@ -14,7 +14,7 @@ TIMESERIES_DAYS = 7
 FILTER_PARENT = "WIK_App"
 FILTER_API = "Export_Hydronet"
 APP_FILTERS = ["WIK_Keten", "WIK_Oppervlaktewater", "WIK_Grondwater"]
-BOUNDS = [ 564270, 6678290, 673280, 6769590]
+BOUNDS = [564270, 6678000, 673280, 6770000]
 LOG_LEVEL = "DEBUG"
 EXCLUDE_PARS = ["Dummy", "P.radar.cal.early", "P.radar.cal.realtime"]
 LOG_FILE = config_dir.joinpath(
@@ -38,22 +38,51 @@ TILE_SOURCES = {
         "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
         "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
         "class": BBoxTileSource,
-        "active": True},
+        "visible": True},
     "hoofdrioolgemaal": {"url": (
             "https://maps.aaenmaas.nl/services/wms?"
             "service=WMS&version=1.3.0&request=GetMap&layers=LCMS_afvalwater:RIOOLGEMAAL"
             "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
             "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
             "class": BBoxTileSource,
-            "active": True},
+            "visible": True},
+    "overstortconstructie": {"url": (
+            "https://www.hydrobase.nl/geoserver/ows?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=WIK:OverstortConstructie"
+            "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
+            "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
+            "class": BBoxTileSource,
+            "visible": False},
     "leidingtrace": {"url": (
             "https://maps.aaenmaas.nl/services/wms?"
             "service=WMS&version=1.3.0&request=GetMap&layers=LCMS_afvalwater:LEIDINGSEGMENT"
             "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
             "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
             "class": BBoxTileSource,
-            "active": False}
+            "visible": False},
+    "watergangen": {"url": (
+            "https://maps.aaenmaas.nl/services/wms?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=DAMO_S:HYDROOBJECT"
+            "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
+            "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
+            "class": BBoxTileSource,
+            "visible": False},
+    "rioleringsdeelgebied": {"url": (
+            "https://www.hydrobase.nl/geoserver/ows?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=WIK:Rioleringsdeelgebied"
+            "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
+            "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
+            "class": BBoxTileSource,
+            "visible": False},
+    "waterschapsgrens": {"url": (
+            "https://maps.aaenmaas.nl/services/wms?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=LCMS:GRE_WATERSCHAP"
+            "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
+            "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
+            "class": BBoxTileSource,
+            "visible": True}
     }
+
 FILTER_RELATIONS = {"WIK_KET_Rioolgemaal": "RIOLERINGSDISTRICT",
 					"Hydronet_Deurne": "RIOLERINGSDISTRICT",
                     "Hydronet_Gemert-Bakel": "RIOLERINGSDISTRICT",

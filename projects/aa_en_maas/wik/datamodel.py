@@ -89,9 +89,8 @@ class Data(object):
         self.locations.fetch(tuple_values)
         self.parameters.fetch(values)
 
-    def update_locations_select(self, location_names):
+    def update_locations_select(self, location_ids):
         """Update datamodel on selected locations."""
-        location_ids = self.locations._to_ids(location_names)
         self.locations._update_selected(location_ids)
 
         if location_ids:
@@ -114,11 +113,11 @@ class Data(object):
         gdf["geometry"] = gdf.apply(lambda x: Point(x["x"], x["y"]), axis=1)
         gdf["distance"] = gdf["geometry"].distance(Point(x, y))
         gdf = gdf.loc[gdf["distance"] < distance_threshold]
-        location_ids = list(
+        return list(
             set(gdf["locationId"].to_list() + self.locations.selected_ids)
         )
 
-        self.locations._update_selected(location_ids)
+        #self.locations._update_selected(location_ids)
 
     def create_timeseries(self, location_ids, parameter_ids):
         """Update timeseries."""
@@ -378,6 +377,7 @@ class Data(object):
 
 
         def _update_selected(self, location_ids):
+            #print(self.df.head(10))
             x = self.df.loc[self.df["locationId"].isin(location_ids)].x.to_list()
             y = self.df.loc[self.df["locationId"].isin(location_ids)].y.to_list()
             self.selected.data = {"x": x, "y": y}

@@ -174,12 +174,10 @@ def update_on_tap(event):
 
     # update datamodel (locations selected)
     distance_threshold = (map_fig.x_range.end - map_fig.x_range.start) * 0.005
-    data.update_map_tab(x, y, distance_threshold)
+    location_ids = data.update_map_tab(x, y, distance_threshold)
 
     # update locations filter
-    
-    # Neeltje, hier selected_locations.values zijn de locationIds die geselecteerd worden op de kaart, niet de namen.
-    select_locations.value = data.locations.selected_names
+    select_locations.value = location_ids
 
 
 def update_on_filter_select(attrname, old, new):
@@ -360,6 +358,15 @@ def update_background(attrname, old, new):
     idx = next(idx for idx, i in enumerate(map_fig.renderers) if i.name == "background")
     map_fig.renderers[idx].tile_source = tile_source
 
+def update_map_layers(attrname, old, new):
+    """Update visible map-layers on change."""
+    for idx, i in enumerate(map_layers.labels):
+        if idx in new:
+            map_fig.renderers[map_fig_idx[i]].visible = True
+        else:
+            map_fig.renderers[map_fig_idx[i]].visible = False
+
+
 log_dir = LOG_FILE.parent
 log_dir.mkdir(exist_ok=True)
 logFormatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
@@ -381,16 +388,18 @@ data = Data(logger)
 map_glyphs = [
     {
         "type": "circle",
-        "size": 12,
+        "size": 10,
         "source": data.locations.source,
         "line_color": "line_color",
         "fill_color": "fill_color",
+        "hover_color": "red",
+        "hover_alpha": 0.8,
         "line_width": 1,
         "legend_field": "label",
     },
     {
         "type": "circle",
-        "size": 13,
+        "size": 12,
         "source": data.locations.selected,
         "fill_color": "red",
     },
@@ -400,7 +409,7 @@ map_fig = map_figure.generate(
     bounds=data.locations.bounds,
     glyphs=map_glyphs,
     background="topografie",
-    map_layers={k: v for k, v in TILE_SOURCES.items() if v["active"]}
+    map_layers=TILE_SOURCES
 )
 
 map_fig.name = "map_fig"
@@ -413,8 +422,14 @@ map_fig.on_event(events.DoubleTap, update_on_double_tap)
 
 # %% define map-controls and handlers
 map_options = list(TILE_SOURCES.keys())
-map_active = [idx for idx, v in enumerate(TILE_SOURCES.values()) if v["active"]]
+map_active = [idx for idx, v in enumerate(TILE_SOURCES.values()) if v["visible"]]
 map_layers = CheckboxGroup(labels=map_options, active=map_active)
+
+map_fig_idx = {
+    i.name: idx for idx, i in enumerate(map_fig.renderers) if i.name in map_layers.labels
+    }
+
+map_layers.on_change("active", update_map_layers)
 
 background = RadioGroup(labels=["topografie", "luchtfoto"], active=0)
 
@@ -572,8 +587,8 @@ height = 1080 * 0.82
 
 select_locations.size = 10
 #map_fig.sizing_mode = "stretch_width"
-map_fig.height = int(height * 0.85)
-map_fig.width = int(width * 0.85)
+map_fig.height = int(height * 0.75)
+map_fig.width = int(width * 0.65)
 map_controls.sizing_mode = "stretch_both"
 map_panel = Panel(child=row(map_fig,map_controls),
                   title="kaart",

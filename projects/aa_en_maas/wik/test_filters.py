@@ -26,20 +26,19 @@ def test_fews_get_filters_relations():
     return gdf
 
 
-def test_data_fetch_relations():
+def test_data_fetch_relations(filter_id = "WIK_KET_Rioolgemaal"):
     """Test of related locations goed worden weggegooid."""
-    filter_id = "WIK_KET_Rioolgemaal"
     tuple_values = data.filters.get_tuples([filter_id])
     data.locations.fetch(tuple_values)
     
     return "BER-HEE-KER" not in data.locations.df["locationId"]
     
-def test_data_fetch_non_relations():
+def test_data_fetch_non_relations(filter_id = "WIK_KET_Neerslag"):
     """Test of het zonder related locations nog werkt."""
-    filter_id = "WIK_KET_Neerslag"
     tuple_values = data.filters.get_tuples([filter_id])
     data.locations.fetch(tuple_values)
     
 def test_tuple_values():
     values = ['WIK_KET_Rioolgemaal']
     return data.filters.get_tuples(values)
+
