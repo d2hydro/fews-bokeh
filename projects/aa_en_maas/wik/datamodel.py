@@ -80,6 +80,7 @@ class Data(object):
         location_ids += df[df["parentLocationId"].isin(location_ids)][
             "parentLocationId"
         ].index.to_list()
+        
         return location_ids
 
     def update_filter_select(self, values):

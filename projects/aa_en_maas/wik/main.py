@@ -23,6 +23,7 @@ from bokeh.layouts import row, column
 import ctypes
 import numpy as np
 import os
+from copy import copy, deepcopy
 
 from datamodel import Data
 import pandas as pd
@@ -92,7 +93,7 @@ def _create_time_col(time_figs):
 def _create_timefig():
     """Create a time-fig."""
     if all([select_locations.value, select_parameters.value]):
-        # print(select_locations.value, select_parameters.value)
+        print(select_locations.value, select_parameters.value)
         # print(select_parameters.value)
         data.create_timeseries(select_locations.value, select_parameters.value)
 
@@ -201,16 +202,17 @@ def update_on_filter_select(attrname, old, new):
 def update_on_locations_select(attrname, old, new):
     """Update when user selects in locations filter."""
     logger.debug("event: update_on_locations_select")
-    locations_select = select_locations.value
-
+    locations_select = list(select_locations.value)
+    
     # update datamodel (locations & parameters)
+    
     data.update_locations_select(locations_select)
 
     # clean filters
-    _clean_filters()
+    #_clean_filters()
 
     # update timefig (if locs, pars are selected)
-    _create_timefig()
+    #_create_timefig()
 
 
 def update_on_parameters_select(attrname, old, new):
