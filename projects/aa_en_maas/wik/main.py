@@ -188,7 +188,7 @@ def update_on_tap(event):
     # update locations filter
     src = data.locations.source
     mask = np.isin(src.data["index"], src.selected.indices)
-    location_ids = list(src.data["locationId"][mask])
+    location_ids = list(np.array(src.data["locationId"])[mask])
     select_locations.value = location_ids
 
 
@@ -202,12 +202,15 @@ def update_on_filter_select(attrname, old, new):
     data.update_filter_select(values)
 
     # set locations options
+
     select_locations.options = data.locations.options
     # print(data.parameters.options)
-    select_parameters.options = data.parameters.options
+    if len(select_locations.value) == 0:
+        print(data.parameters.options)
+        select_parameters.options = data.parameters.options
 
-    # # clean filters
-    _clean_filters()
+        # # clean filters
+        _clean_filters()
 
 
 def update_on_locations_select(attrname, old, new):
@@ -221,7 +224,7 @@ def update_on_locations_select(attrname, old, new):
     # update selected ids
     src = data.locations.source
     mask = np.isin(src.data["locationId"], locations_select)
-    src.selected.indices = list(src.data["index"][mask])
+    src.selected.indices = list(np.array(src.data["index"])[mask])
 
     # clean filters
     _clean_filters()
@@ -528,6 +531,8 @@ time_figs_x_range = Range1d(
 
 time_figs_x_range.on_change("end", update_on_x_range)
 time_figs_x_range.on_change("start", update_on_x_range)
+
+print(time_figs_x_range.id)
 
 time_figs_y_range = Range1d(start=-1, end=1, bounds=None)
 

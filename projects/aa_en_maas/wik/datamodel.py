@@ -181,7 +181,7 @@ class Data(object):
         self.timeseries.end_datetime = end_datetime
         timespan = (end_datetime - start_datetime).days
         thinner = int(timespan * 86400 * 1000 / width)
-        _, hr_data = self.fews_api.get_timeseries(
+        result = self.fews_api.get_timeseries(
             filterId=self.filters.selected["id"],
             locationIds=location_ids,
             parameterIds=parameter_ids,
@@ -191,6 +191,8 @@ class Data(object):
             thinning=thinner,
             buffer=BUFFER,
         )
+        if result is not None:
+            _, hr_data = result
 
         # update data sources
         for ts in hr_data:
