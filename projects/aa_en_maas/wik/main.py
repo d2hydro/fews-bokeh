@@ -18,7 +18,7 @@ from bokeh.models.widgets import (
     DatePicker,
     DateRangeSlider,
 )
-from bokeh.models import ColumnDataSource, Range1d, RadioGroup, CheckboxGroup, Div
+from bokeh.models import ColumnDataSource, Range1d, RadioGroup, CheckboxGroup, Div, Legend, TapTool
 from bokeh.layouts import row, column
 import ctypes
 import numpy as np
@@ -70,7 +70,9 @@ def _datetime_offset(values, offset_years):
 
 def _clean_filters():
     # clean parameters filter
-    select_parameters.options = data.parameters.options
+    options = [i for i in data.parameters.options if i[0] in data.parameters.ids]
+    select_parameters.options = options
+
     parameters_select = [
         val for val in select_parameters.value if val in data.parameters.ids
     ]
@@ -94,8 +96,10 @@ def _create_timefig():
     """Create a time-fig."""
     if all([select_locations.value, select_parameters.value]):
         print(select_locations.value, select_parameters.value)
+        location_ids = list(select_locations.value)
+        parameter_ids = list(select_parameters.value)
         # print(select_parameters.value)
-        data.create_timeseries(select_locations.value, select_parameters.value)
+        data.create_timeseries(location_ids, parameter_ids)
 
         logger.debug("event: _create_time_fig")
         # print(data.timeseries.timeseries)
@@ -141,8 +145,11 @@ def _create_timefig():
 
             # update search-data
             ts_labels = data.timeseries.timeseries["label"].to_list()
+          
             select_search_timeseries.options = ts_labels
+            print("1",select_search_timeseries.options)
             select_search_timeseries.value = ts_labels[0]
+            print("2",select_search_timeseries.value)
 
             # update layout
             search_fig.yaxis[0].ticker = [
@@ -155,6 +162,7 @@ def _create_timefig():
                 data.timeseries.lr_y_range.end,
             ]
             ts_labels = data.timeseries.timeseries["label"].to_list()
+            print ("3",ts_labels)
             time_col = _create_time_col(top_figs)
             _remove_timefig()
             tabs.tabs.append(Panel(child=time_col, title="grafiek", name="grafiek"))
@@ -171,13 +179,16 @@ def update_on_double_tap(event):
 def update_on_tap(event):
     """Update when tap in map with location selected."""
     logger.debug("event: update_on_tap")
-    x, y = event.__dict__["x"], event.__dict__["y"]
+    #x, y = event.__dict__["x"], event.__dict__["y"]
 
     # update datamodel (locations selected)
-    distance_threshold = (map_fig.x_range.end - map_fig.x_range.start) * 0.005
-    location_ids = data.update_map_tab(x, y, distance_threshold)
+    #distance_threshold = (map_fig.x_range.end - map_fig.x_range.start) * 0.005
+    #location_ids = data.update_map_tab(x, y, distance_threshold)
 
     # update locations filter
+    src = data.locations.source
+    mask = np.isin(src.data["index"], src.selected.indices)
+    location_ids = list(src.data["locationId"][mask])
     select_locations.value = location_ids
 
 
@@ -196,7 +207,7 @@ def update_on_filter_select(attrname, old, new):
     select_parameters.options = data.parameters.options
 
     # # clean filters
-    # _clean_filters()
+    _clean_filters()
 
 
 def update_on_locations_select(attrname, old, new):
@@ -205,20 +216,24 @@ def update_on_locations_select(attrname, old, new):
     locations_select = list(select_locations.value)
     
     # update datamodel (locations & parameters)
-    
     data.update_locations_select(locations_select)
+    
+    # update selected ids
+    src = data.locations.source
+    mask = np.isin(src.data["locationId"], locations_select)
+    src.selected.indices = list(src.data["index"][mask])
 
     # clean filters
-    #_clean_filters()
+    _clean_filters()
 
     # update timefig (if locs, pars are selected)
-    #_create_timefig()
+    _create_timefig()
 
 
 def update_on_parameters_select(attrname, old, new):
     """Update when user selects in parameter filter."""
     logger.debug("event: update_on_parameters_select")
-
+  #  parameters_select = list(select_parameters.value)
     # clean filters
     _clean_filters()
 
@@ -305,7 +320,7 @@ def update_on_x_range(attrname, old, new):
 
     # determine refinement or expansion
     if (
-        (ts_timedelta / fig_timedelta > 2)
+        (ts_timedelta / max(fig_timedelta, pd.Timedelta(hours=1)) > 2)
         | (start_datetime < (data.timeseries.start_datetime - ts_timedelta * BUFFER))
         | (end_datetime > (data.timeseries.end_datetime + ts_timedelta * BUFFER))
     ):
@@ -394,17 +409,14 @@ map_glyphs = [
         "source": data.locations.source,
         "line_color": "line_color",
         "fill_color": "fill_color",
+        "selection_color":"red",
+        "nonselection_fill_alpha":1,
+        "nonselection_line_alpha":1,
         "hover_color": "red",
-        "hover_alpha": 0.8,
+        "hover_alpha": 0.6,
         "line_width": 1,
         "legend_field": "label",
-    },
-    {
-        "type": "circle",
-        "size": 12,
-        "source": data.locations.selected,
-        "fill_color": "red",
-    },
+    }
 ]
 
 map_fig = map_figure.generate(
@@ -419,8 +431,10 @@ map_fig.name = "map_fig"
 # event to select locations on the map
 map_fig.on_event(events.Tap, update_on_tap)
 
+
+
 # event to deselect all selected locations
-map_fig.on_event(events.DoubleTap, update_on_double_tap)
+#map_fig.on_event(events.DoubleTap, update_on_double_tap)
 
 # %% define map-controls and handlers
 map_options = list(TILE_SOURCES.keys())
@@ -460,12 +474,14 @@ select_locations = MultiSelect(
 )
 
 select_locations.on_change("value", update_on_locations_select)
+# select_locations.js_link("value",
+#                          data.locations.source.selected,
+#                          "indices")
 
 # %% define parameter selection and handlers
 select_parameters = MultiSelect(
-    title="Parameters:", value=[], options=data.parameters.names
+    title="Parameters:", value=[], options=data.parameters.options
 )
-
 
 select_parameters.on_change("value", update_on_parameters_select)
 
@@ -507,13 +523,13 @@ time_figs_x_range = Range1d(
     bounds=(
         centre_datetime - pd.Timedelta(days=45),
         centre_datetime + pd.Timedelta(days=45),
-    ),
+    )
 )
 
 time_figs_x_range.on_change("end", update_on_x_range)
 time_figs_x_range.on_change("start", update_on_x_range)
 
-time_figs_y_range = Range1d(start=-1, end=1, bounds="auto")
+time_figs_y_range = Range1d(start=-1, end=1, bounds=None)
 
 time_figs = [
     time_figure.generate(
@@ -597,7 +613,8 @@ map_panel = Panel(child=row(map_fig,map_controls),
                   name="kaart")
 search_fig.width = int(width * 0.75)
 search_fig.height = int(height * 0.15 * 0.75)
-period_slider.width = int(width * 0.75 - 80)
+#period_slider.width = int(width * 0.75 - 80)
+period_slider.width = int(width * 0.75)
 period_slider.align = "end"
 
 time_col = _create_time_col(time_figs)
@@ -613,6 +630,7 @@ search_period_control = column(
 )
 
 search_period_control.width = int(width * 0.2)
+
 controls = column(filters + [select_locations,
                              select_parameters,
                              search_period_control,

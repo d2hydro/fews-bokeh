@@ -207,12 +207,16 @@ class Data(object):
         for key, value in self.timeseries.hr_graphs.items():
             y_range = value["y_range"]
             glyphs = self.timeseries.hr_glyphs[key]
-            y_end = max([glyph["source"].data["value"].max() for glyph in glyphs])
-            y_start = min([glyph["source"].data["value"].min() for glyph in glyphs])
-            y_range.end = y_end
-            y_range.start = y_start
-            y_range.reset_end = y_end
-            y_range.reset_start = y_start
+            glyphs = [glyph for glyph in glyphs if len(glyph["source"].data["value"]) > 0]
+            if glyphs:
+                print("setting y range")
+                y_end = max([glyph["source"].data["value"].max() for glyph in glyphs])
+                y_start = min([glyph["source"].data["value"].min() for glyph in glyphs])
+                range_buffer = 0.1 * (y_end - y_start)
+                y_range.end = y_end + range_buffer 
+                y_range.start = y_start
+                y_range.reset_end = y_end + range_buffer 
+                y_range.reset_start = y_start
 
     def get_search_timeseries(self):
         """Update options and values for search timeseries."""
@@ -353,7 +357,9 @@ class Data(object):
                         fill_color = "black"
 
                     self.sets[filter_id]["line_color"] = line_color
+                    self.sets[filter_id]["nonselection_line_color"] = line_color
                     self.sets[filter_id]["fill_color"] = fill_color
+                    self.sets[filter_id]["nonselection_fill_color"] = fill_color
                     self.sets[filter_id]["label"] = filter_name
                 # add locations to df
                 self.df = self.df.append(self.sets[filter_id])
@@ -620,7 +626,8 @@ class Data(object):
                             "type": "line",
                             "color": color,
                             "source": source,
-                            "legend_label": f"{short_name} {parameter_name}",
+                            "legend_label": f"{short_name}",
+               #             "legend_label": f"{short_name} {parameter_name}",
                         }
                     ]
 
@@ -630,6 +637,7 @@ class Data(object):
                         (lambda x: f"{x['location_name']} ({x['parameter_name']})"),
                         axis=1,
                     )
+        
                     self.timeseries.set_index(
                         ["location_id", "parameter_id"], inplace=True, drop=False
                     )
@@ -666,10 +674,14 @@ class Data(object):
                             self.hr_graphs[group]["y_bounds"]["end"]
                             == self.hr_graphs[group]["y_bounds"]["start"]
                         ):
-                            self.hr_graphs[group]["y_bounds"]["end"] += 0.1
-                            self.hr_graphs[group]["y_bounds"]["start"] -= 0.1
+                            self.hr_graphs[group]["y_bounds"]["end"] -= 0.5
+                            self.hr_graphs[group]["y_bounds"]["start"] += 0.5
+                            
+                        range_buffer = 0.1 * (
+                            self.hr_graphs[group]["y_bounds"]["end"] - self.hr_graphs[group]["y_bounds"]["start"]
+                            )
+                        
                         self.hr_graphs[group]["y_range"] = Range1d(
                             start=self.hr_graphs[group]["y_bounds"]["start"],
-                            end=self.hr_graphs[group]["y_bounds"]["end"],
-                            bounds=None,
+                            end=self.hr_graphs[group]["y_bounds"]["end"] + range_buffer
                         )

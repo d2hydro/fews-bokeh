@@ -6,7 +6,7 @@ Created on Fri Dec 11 14:59:08 2020
 """
 
 
-from bokeh.models import HoverTool, Range1d, BBoxTileSource, WMTSTileSource, Legend, LegendItem
+from bokeh.models import HoverTool, Range1d, BBoxTileSource, WMTSTileSource, Legend, LegendItem, TapTool
 from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 
@@ -37,7 +37,9 @@ def generate(width=None,
              glyphs=None,
              background="background",
              map_layers= {},
-             active_scroll="wheel_zoom"):
+             save_tool="save",
+             active_scroll="wheel_zoom",
+             toolbar_location="above"):
     """Map-figure from supplied bokeh input parameters."""
     x_range = Range1d(start=bounds[0],
                       end=bounds[2],
@@ -50,18 +52,24 @@ def generate(width=None,
     map_hover = HoverTool(tooltips=[("Locatie", "@shortName"),
                                     ("ID", "@locationId")
                                     ])
+    
+    map_hover.toggleable = False
 
-    tools = ["wheel_zoom", "pan", "reset", map_hover]
+    tools = ["tap", "wheel_zoom", "pan", "reset", map_hover, save_tool]
 
     map_fig = figure(tools=tools,
                      active_scroll=active_scroll,
                      height=height,
                      width=width,
                      x_range=x_range,
-                     y_range=y_range)
+                     y_range=y_range,
+                     toolbar_location=toolbar_location)
 
     map_fig.axis.visible = False
+    map_fig.toolbar.logo = None
     map_fig.toolbar.autohide = True
+    
+    map_fig.select(type=TapTool)
 
     # add background
     tile_source = get_tileource(background)
