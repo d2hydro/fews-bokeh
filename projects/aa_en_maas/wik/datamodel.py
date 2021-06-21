@@ -214,7 +214,8 @@ class Data(object):
                 print("setting y range")
                 y_end = max([glyph["source"].data["value"].max() for glyph in glyphs])
                 y_start = min([glyph["source"].data["value"].min() for glyph in glyphs])
-                range_buffer = 0.1 * (y_end - y_start)
+      #          range_buffer = 0.1 * (y_end - y_start)
+                range_buffer = 0.1 * max((y_end - y_start,1))
                 y_range.end = y_end + range_buffer 
                 y_range.start = y_start
                 y_range.reset_end = y_end + range_buffer 

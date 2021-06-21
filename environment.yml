@@ -9,3 +9,5 @@ dependencies:
   - pandas
   - geopandas
   - requests
+  - gevent
+  - flask
