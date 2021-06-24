@@ -1,0 +1,14 @@
+name: fewsbokeh
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - bokeh
+  - pandas
+  - geopandas
+  - requests
+  - gevent
+  - flask
+  - spyder

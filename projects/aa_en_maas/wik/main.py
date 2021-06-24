@@ -2,6 +2,7 @@
 from config import TITLE, LOG_LEVEL, LOG_FILE, TILE_SOURCES
 
 from server_config import BUFFER
+from bokeh.layouts import column
 
 from fewsbokeh import map_figure, time_figure
 import logging
@@ -86,9 +87,13 @@ def _create_time_col(time_figs):
         fig.width = int(width * 0.75)
 
     time_col = column(time_figs)
-    time_col.children.append(search_fig)
-    time_col.children.append(row(Div(width=40, text=""), period_slider))
 
+    time_col.children.append(row(column(search_fig,period_slider),margin = (15,0,0,25), sizing_mode='scale_width'))
+
+#    time_col.children.append(search_fig)
+#    time_col.children.append(row(Div(width=40, text=""), period_slider))
+
+  
     return time_col
 
 
@@ -241,8 +246,10 @@ def update_on_search_select(attrname, old, new):
     """Update low lr graph when user updates any selection."""
     logger.debug("event: update_on_search_select")
     start_datetime = pd.Timestamp(search_start_date_picker.value)
+ 
     end_datetime = pd.Timestamp(search_end_date_picker.value)
     search_series = select_search_timeseries.value
+    print(start_datetime,end_datetime,search_series)
     if search_series:
         data.update_lr_timeseries(search_series, start_datetime, end_datetime)
 
@@ -524,7 +531,6 @@ time_figs_x_range = Range1d(
 
 time_figs_x_range.on_change("end", update_on_x_range)
 time_figs_x_range.on_change("start", update_on_x_range)
-
 time_figs_y_range = Range1d(start=-1, end=1, bounds=None)
 
 time_figs = [
@@ -554,6 +560,8 @@ search_fig = time_figure.generate(
 
 search_fig.toolbar_location = None
 search_fig.ygrid.visible = False
+search_fig.toolbar.active_drag = None
+search_fig.toolbar.active_scroll = None
 search_fig.yaxis[0].ticker = [
     data.timeseries.lr_y_range.start,
     data.timeseries.lr_y_range.end,
@@ -593,7 +601,7 @@ period_slider.format = "%d-%m-%Y"
 period_slider.on_change("value", update_on_period)
 period_slider.js_link("value_throttled", time_figs_x_range, "start", attr_selector=0)
 period_slider.js_link("value_throttled", time_figs_x_range, "end", attr_selector=1)
-
+#period_slider.show_value=True
 # %% define layout
 width = 1920 * 0.82
 height = 1080 * 0.82
@@ -607,11 +615,12 @@ map_controls.sizing_mode = "stretch_both"
 map_panel = Panel(child=row(map_fig,map_controls),
                   title="kaart",
                   name="kaart")
-search_fig.width = int(width * 0.75)
+#search_fig.width = int(width * 0.75)
 search_fig.height = int(height * 0.15 * 0.75)
 #period_slider.width = int(width * 0.75 - 80)
-period_slider.width = int(width * 0.75)
-period_slider.align = "end"
+#period_slider.width = int(width * 0.75)
+
+#period_slider.align = "end"
 
 time_col = _create_time_col(time_figs)
 
@@ -634,6 +643,9 @@ controls = column(filters + [select_locations,
                   )
 # controls.height = int(height * 0.75 - 80)
 layout = row(controls, tabs)
+
+
+
 
 curdoc().add_root(layout)
 curdoc().title = TITLE

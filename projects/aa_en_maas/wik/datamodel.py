@@ -101,6 +101,7 @@ class Data(object):
                 parameterIds=self.parameters.df.index.to_list(),
                 locationIds=location_ids,
             )
+            print("headers=",headers)
             if headers is not None:
                 self.timeseries.headers = headers
                 self.parameters.update(
@@ -562,6 +563,7 @@ class Data(object):
                 thinning=thinner,
                 buffer=BUFFER,
             )
+            print(result)
 
             if result is not None:
                 self.time_zone, self.hr_data = result

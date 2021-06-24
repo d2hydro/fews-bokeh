@@ -32,3 +32,5 @@ projects/aa_en_maas/serve_bokeh.bat
 projects/aa_en_maas/serve_flask.bat
 projects/aa_en_maas/serve_bokeh.bat
 projects/aa_en_maas/serve_flask.bat
+*.bak
+*.bat

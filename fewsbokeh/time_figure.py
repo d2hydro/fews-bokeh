@@ -5,7 +5,7 @@ Created on Fri Dec 11 14:59:08 2020
 @author: danie
 """
 
-from bokeh.models  import HoverTool, DatetimeTickFormatter, Range1d, Legend, PanTool, BoxZoomTool, Legend, WheelZoomTool
+from bokeh.models  import HoverTool, DatetimeTickFormatter, Range1d, Legend, PanTool, BoxZoomTool, WheelZoomTool
 from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 import pandas as pd
@@ -28,7 +28,9 @@ def generate(width=None,
              active_drag="box_zoom",
              save_tool="save",
              toolbar_location="above",
-             title_visible=False):
+             title_visible=False,
+             ):
+         
     """Generate a time-figure from supplied bokeh input parameters."""
     time_hover = HoverTool(tooltips=[("datum-tijd", "@datetime{%F}"),
                                      ("waarde", "@value{(0.00)}")],
@@ -61,7 +63,6 @@ def generate(width=None,
     y_range.min_interval=0.1
     time_fig = figure(title=title,
                       tools=tools,
-                      # active_drag=None,
                       height=height,
                       width=width,
                       sizing_mode=sizing_mode,
@@ -71,7 +72,8 @@ def generate(width=None,
                       y_range=y_range,
                       active_scroll=active_scroll,
                       active_drag=active_drag,
-                      toolbar_location=toolbar_location)
+                      toolbar_location=toolbar_location,
+                      )
 
     wheel_zoom = next((i for i in time_fig.tools if type(i) == WheelZoomTool), None)
     if wheel_zoom:
@@ -91,7 +93,6 @@ def generate(width=None,
     time_fig.title.visible = title_visible
 
     if glyphs:
-      #  legenda=[]
         for glyph in glyphs:
             glyph_type = glyph["type"]
           
@@ -102,6 +103,5 @@ def generate(width=None,
             time_fig.legend.click_policy = "hide"
      
             time_fig.add_layout(time_fig.legend[0], "right")
-      #      time_fig.add_layout = (test, 'right')
-            
+            time_fig.legend[0].label_text_font_size = "9pt"
     return time_fig
