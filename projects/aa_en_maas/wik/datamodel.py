@@ -85,7 +85,6 @@ class Data(object):
 
     def update_filter_select(self, values):
         """Update datamodel on selected filter."""
-        #print(values)
         tuple_values = self.filters.get_tuples(values)
         self.locations.fetch(tuple_values)
         self.parameters.fetch(values)
@@ -129,8 +128,6 @@ class Data(object):
         parameter_groups = self.fews_api.parameters.loc[parameter_ids][
             "parameterGroup"
         ].to_list()
-
-        # print(parameter_groups)
 
         self.timeseries.create(
             location_ids, parameter_ids, self.filters.selected["id"], parameter_groups
@@ -211,7 +208,6 @@ class Data(object):
             glyphs = self.timeseries.hr_glyphs[key]
             glyphs = [glyph for glyph in glyphs if len(glyph["source"].data["value"]) > 0]
             if glyphs:
-                print("setting y range")
                 y_end = max([glyph["source"].data["value"].max() for glyph in glyphs])
                 y_start = min([glyph["source"].data["value"].min() for glyph in glyphs])
       #          range_buffer = 0.1 * (y_end - y_start)
@@ -387,7 +383,6 @@ class Data(object):
 
 
         def _update_selected(self, location_ids):
-            #print(self.df.head(10))
             x = self.df.loc[self.df["locationId"].isin(location_ids)].x.to_list()
             y = self.df.loc[self.df["locationId"].isin(location_ids)].y.to_list()
             self.selected.data = {"x": x, "y": y}
@@ -552,13 +547,11 @@ class Data(object):
             return result
 
         def create(self, location_ids, parameter_ids, filter_id, parameter_groups):
-            # print(location_ids, parameter_ids, filter_id, parameter_groups)
             """Update timeseries data."""
             # high resolution data
             self._init_timeseries()  # create an empty dataframe with ts specs
             timespan = (self.end_datetime - self.start_datetime).days
             thinner = int(timespan * 86400 * 1000 / width)
-            # print(location_ids, parameter_ids, filter_id, parameter_groups)
             result = self.fews_api.get_timeseries(
                 filterId=filter_id,
                 locationIds=location_ids,
@@ -622,7 +615,6 @@ class Data(object):
                         source = ColumnDataSource({"datetime": [], "value": []})
 
                     ts_specs["source"] = source
-                    # print(ts_specs)
                     timeseries += [ts_specs]
                     self.hr_glyphs[group] += [
                         {

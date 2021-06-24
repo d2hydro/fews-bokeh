@@ -98,11 +98,9 @@ def _create_timefig():
         print(select_locations.value, select_parameters.value)
         location_ids = list(select_locations.value)
         parameter_ids = list(select_parameters.value)
-        # print(select_parameters.value)
         data.create_timeseries(location_ids, parameter_ids)
 
         logger.debug("event: _create_time_fig")
-        # print(data.timeseries.timeseries)
         # update timeseries search select
         if not data.timeseries.timeseries.empty:
 
@@ -147,9 +145,7 @@ def _create_timefig():
             ts_labels = data.timeseries.timeseries["label"].to_list()
           
             select_search_timeseries.options = ts_labels
-            print("1",select_search_timeseries.options)
             select_search_timeseries.value = ts_labels[0]
-            print("2",select_search_timeseries.value)
 
             # update layout
             search_fig.yaxis[0].ticker = [
@@ -162,7 +158,6 @@ def _create_timefig():
                 data.timeseries.lr_y_range.end,
             ]
             ts_labels = data.timeseries.timeseries["label"].to_list()
-            print ("3",ts_labels)
             time_col = _create_time_col(top_figs)
             _remove_timefig()
             tabs.tabs.append(Panel(child=time_col, title="grafiek", name="grafiek"))
@@ -204,9 +199,7 @@ def update_on_filter_select(attrname, old, new):
     # set locations options
 
     select_locations.options = data.locations.options
-    # print(data.parameters.options)
     if len(select_locations.value) == 0:
-        print(data.parameters.options)
         select_parameters.options = data.parameters.options
 
         # # clean filters
@@ -531,8 +524,6 @@ time_figs_x_range = Range1d(
 
 time_figs_x_range.on_change("end", update_on_x_range)
 time_figs_x_range.on_change("start", update_on_x_range)
-
-print(time_figs_x_range.id)
 
 time_figs_y_range = Range1d(start=-1, end=1, bounds=None)
 
