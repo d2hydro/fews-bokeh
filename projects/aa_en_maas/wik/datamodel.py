@@ -166,6 +166,9 @@ class Data(object):
         else:
             y_start, y_end = [-0.1, 0.1]
 
+        if y_start == y_end:
+            y_start -= 0.1
+            y_end += 0.1
         self.timeseries.lr_y_range.start = y_start
         self.timeseries.lr_y_range.end = y_end
 
@@ -499,7 +502,10 @@ class Data(object):
             self.hr_graphs = None
             self.x_bounds = None
             self.x_axis_label = "datum-tijd [gmt +1]"
-            self.lr_y_range = Range1d(start=-0.1, end=0.1, bounds=None)
+            self.lr_y_range = Range1d(start=-0.1,
+                                      end=0.1,
+                                      min_interval=0.1,
+                                      bounds=None)
             self.hr_glyphs = None
             self.lr_glyph = {"type": "line", "color": palette[0], "source": self.lr_src}
 
