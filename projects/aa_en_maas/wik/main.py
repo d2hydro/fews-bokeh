@@ -209,7 +209,15 @@ def update_on_filter_select(attrname, old, new):
 
         # # clean filters
         _clean_filters()
+    else:
+        locations_select = list(select_locations.value)
+        _update_source_indices(locations_select)
 
+def _update_source_indices(locations_select):
+    src = data.locations.source
+    mask = np.isin(src.data["locationId"], locations_select)
+    src.selected.indices = list(np.array(src.data["index"])[mask])
+    
 
 def update_on_locations_select(attrname, old, new):
     """Update when user selects in locations filter."""
@@ -220,9 +228,7 @@ def update_on_locations_select(attrname, old, new):
     data.update_locations_select(locations_select)
     
     # update selected ids
-    src = data.locations.source
-    mask = np.isin(src.data["locationId"], locations_select)
-    src.selected.indices = list(np.array(src.data["index"])[mask])
+    _update_source_indices(locations_select)
 
     # clean filters
     _clean_filters()
