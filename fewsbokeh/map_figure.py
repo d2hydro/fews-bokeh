@@ -81,9 +81,14 @@ def generate(width=None,
         layer_names.reverse()
         for layer_name in layer_names:
             tile_source = get_tileource(layer_name, urls=map_layers)
+            if "alpha" in map_layers[layer_name].keys():
+                alpha = map_layers[layer_name]["alpha"]
+            else:
+                alpha = 1
             map_fig.add_tile(tile_source,
                              name=layer_name,
-                             visible=map_layers[layer_name]["visible"])
+                             visible=map_layers[layer_name]["visible"],
+							 alpha=alpha)
 
     if glyphs:
         for glyph in glyphs:

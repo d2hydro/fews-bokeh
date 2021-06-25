@@ -47,8 +47,8 @@ TILE_SOURCES = {
             "class": BBoxTileSource,
             "visible": True},
     "overstortconstructie": {"url": (
-            "https://www.hydrobase.nl/geoserver/ows?"
-            "service=WMS&version=1.3.0&request=GetMap&layers=WIK:OverstortConstructie"
+            "https://maps.aaenmaas.nl/services/DAMO_S/ows?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=WS_RIOOLOVERSTORT"
             "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
             "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
             "class": BBoxTileSource,
@@ -68,12 +68,13 @@ TILE_SOURCES = {
             "class": BBoxTileSource,
             "visible": False},
     "rioleringsdeelgebied": {"url": (
-            "https://www.hydrobase.nl/geoserver/ows?"
-            "service=WMS&version=1.3.0&request=GetMap&layers=WIK:Rioleringsdeelgebied"
+            "https://maps.aaenmaas.nl/services/DAMO_S/ows?"
+            "service=WMS&version=1.3.0&request=GetMap&layers=WS_RIOLERINGSGEBIED"
             "&width=265&height=265&styles=&crs=EPSG:3857&format=image/png&transparent=true"
             "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
             "class": BBoxTileSource,
-            "visible": False},
+            "visible": False,
+			"alpha": 0.5},
     "waterschapsgrens": {"url": (
             "https://maps.aaenmaas.nl/services/wms?"
             "service=WMS&version=1.3.0&request=GetMap&layers=LCMS:GRE_WATERSCHAP"
