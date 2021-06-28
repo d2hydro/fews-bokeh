@@ -29,7 +29,6 @@ from copy import copy, deepcopy
 from datamodel import Data
 import pandas as pd
 
-USE_JINJA_TEMPLATE = False
 _UNITS_MAPPING = dict(nonequidistant="noneq", second="sec")
 
 
