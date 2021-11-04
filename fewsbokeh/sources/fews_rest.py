@@ -167,6 +167,7 @@ class Api:
         )
         self.timer.reset()
         response = requests.get(rest_url, parameters, verify=self.ssl_verify)
+        print(rest_url)
         self.timer.report("Locations request")
         gdf = gpd.GeoDataFrame()
         if response.status_code == 200:
@@ -198,6 +199,7 @@ class Api:
 
             # self.locations = gdf
             self.timer.report("Locations parsed")
+            print(gdf.head(10))
         return gdf
 
     def get_timeseries(
@@ -238,7 +240,7 @@ class Api:
 
         parameters.update({"documentFormat": self.document_format})
         self.timer.reset()
-        #print(parameters)
+        #print(parameters))
         response = requests.get(rest_url, parameters, verify=self.ssl_verify)
         self.logger.debug(response.url)
         if response.status_code == 200:

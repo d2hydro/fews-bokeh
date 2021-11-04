@@ -34,3 +34,5 @@ projects/aa_en_maas/serve_bokeh.bat
 projects/aa_en_maas/serve_flask.bat
 *.bak
 *.bat
+projects/aa_en_maas/wikservices_add.cmd
+projects/aa_en_maas/wikservices_remove.cmd

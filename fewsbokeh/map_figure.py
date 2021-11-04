@@ -10,7 +10,7 @@ from bokeh.models import HoverTool, Range1d, BBoxTileSource, WMTSTileSource, Leg
 from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 
-URLS = {"luchtfoto": {"url": ("https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?"
+URLS = {"luchtfoto": {"url": ("https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?"
                       "service=WMS&version=1.3.0&request=GetMap&layers=Actueel_ortho25"
                       "&width=265&height=265&styles=&crs=EPSG:3857&format=image/jpeg"
                       "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
