@@ -15,8 +15,8 @@ URLS = {"luchtfoto": {"url": ("https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0
                       "&width=265&height=265&styles=&crs=EPSG:3857&format=image/jpeg"
                       "&bbox={XMIN},{YMIN},{XMAX},{YMAX}"),
                       "class": BBoxTileSource},
-        "topografie": {"url": ("https://geodata.nationaalgeoregister.nl/tiles/service/wmts/"
-                "brtachtergrondkaart/EPSG:3857/{z}/{x}/{y}.png"),
+        "topografie": {"url": ("https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/"
+                "standaard/EPSG:3857/{z}/{x}/{y}.png"),
                "class": WMTSTileSource}
         }
 
@@ -68,7 +68,8 @@ def generate(width=None,
     map_fig.axis.visible = False
     map_fig.toolbar.logo = None
     map_fig.toolbar.autohide = True
-    
+    map_fig.xgrid.grid_line_color = None
+    map_fig.ygrid.grid_line_color = None
     map_fig.select(type=TapTool)
 
     # add background
@@ -88,7 +89,7 @@ def generate(width=None,
             map_fig.add_tile(tile_source,
                              name=layer_name,
                              visible=map_layers[layer_name]["visible"],
-							 alpha=alpha)
+                             alpha=alpha)
 
     if glyphs:
         for glyph in glyphs:
