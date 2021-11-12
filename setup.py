@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup
+from setuptools import setup, find_packages
 import pkg_resources  # part of setuptools
 
 
@@ -18,7 +18,8 @@ setup(
     author='Daniel Tollenaar',
     author_email='daniel@d2hydro.nl',
     license='MIT',
-    packages=['fewsbokeh'],
+    packages=find_packages(),
+    #packages=['fewsbokeh'],
     python_requires='>=3.6',
     install_requires=[
         'pandas',
