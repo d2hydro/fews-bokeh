@@ -5,7 +5,7 @@ Created on Fri Dec 11 14:59:08 2020
 @author: danie
 """
 
-from bokeh.models  import HoverTool, DatetimeTickFormatter, Range1d, Legend, PanTool, BoxZoomTool, WheelZoomTool
+from bokeh.models  import HoverTool, DatetimeTickFormatter, Range1d, Legend, PanTool, BoxZoomTool, WheelZoomTool,NumeralTickFormatter
 from bokeh.plotting import figure
 from bokeh.tile_providers import get_provider, Vendors
 import pandas as pd
@@ -91,7 +91,7 @@ def generate(width=None,
                                                      )
     time_fig.xaxis.visible = x_axis_visible
     time_fig.title.visible = title_visible
-
+    time_fig.yaxis[0].formatter = NumeralTickFormatter(format="0.0")
     if glyphs:
         for glyph in glyphs:
             glyph_type = glyph["type"]
