@@ -12,3 +12,4 @@ dependencies:
   - gevent
   - flask
   - spyder
+  - pydantic
