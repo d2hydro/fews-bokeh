@@ -30,15 +30,3 @@ def maximum(df):
 def minimum(df):
     df['min'] = df["value"].min()
     return df
-
-
-df = pd.read_csv(data_dir / "test_data.csv")
-cumulative(df)
-average(df)
-median(df)
-quantile_90(df)
-quantile_10(df)
-maximum(df)
-minimum(df)
-
-print(df)
