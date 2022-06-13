@@ -93,7 +93,8 @@ class Api:
             qualifier_ids=None,
             thinning=None,
             only_headers=False,
-            show_statistics=False
+            show_statistics=False,
+            parallel=False
             ):
 
         kwargs = self.__kwargs(url_post_fix="timeseries", kwargs=locals())

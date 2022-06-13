@@ -97,6 +97,8 @@ def geo_datum_to_crs(geo_datum: str) -> str:
         if geo_datum[-1] == "S":
             epsg_code += 100
         crs = f"epsg:{epsg_code}"
+    elif geo_datum.lower().startswith("epsg"):
+        crs = geo_datum.lower()
     elif geo_datum in GEODATUM_MAPPING.keys():
         crs = GEODATUM_MAPPING[geo_datum]
     else:

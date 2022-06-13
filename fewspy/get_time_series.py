@@ -30,6 +30,7 @@ def get_time_series(
         only_headers: bool = False,
         show_statistics: bool = False,
         document_format: str = "PI_JSON",
+        parallel: bool = False,
         verify: bool = False,
         logger=LOGGER
         ) -> pd.DataFrame:
