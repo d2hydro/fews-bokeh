@@ -158,6 +158,10 @@ class TimeSeriesSet:
             if len(kwargs["time_series"]) > 0:
                 kwargs["empty"] = False
         return cls(**kwargs)
+    
+    def add(self, time_series_set):
+        # add time_series_set to the time_series_set
+        return self
 
     @property
     def parameter_ids(self):

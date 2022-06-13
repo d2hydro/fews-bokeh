@@ -6,6 +6,8 @@ from .utils.transformations import parameters_to_fews
 from typing import List, Union
 from .time_series import TimeSeriesSet
 from datetime import datetime
+import aiohttp
+import asyncio
 
 
 LOGGER = logging.getLogger(__name__)
@@ -55,16 +57,25 @@ def get_time_series(
     # do the request
     timer = Timer(logger)
     parameters = parameters_to_fews(locals())
-    response = requests.get(url, parameters, verify=verify)
-    timer.report(report_string.format(status="request"))
+    print("parameters=",parameters)
+    
+    if (parallel==False):
+        response = requests.get(url, parameters, verify=verify)
+        timer.report(report_string.format(status="request"))
+    
+        # parse the response
+ 
+        if response.status_code == 200:
+            pi_time_series = response.json()
+            time_series_set = TimeSeriesSet.from_pi_time_series(pi_time_series)
+            timer.report(report_string.format(status="parsed"))
+        else:
+            logger.error(f"FEWS Server responds {response.text}")
+            time_series_set = TimeSeriesSet()
 
-    # parse the response
-    if response.status_code == 200:
-        pi_time_series = response.json()
-        time_series_set = TimeSeriesSet.from_pi_time_series(pi_time_series)
-        timer.report(report_string.format(status="parsed"))
-    else:
-        logger.error(f"FEWS Server responds {response.text}")
-        time_series_set = TimeSeriesSet()
+   
+           
+        time_series_set = result_async
+        print(time_series_set)
 
     return time_series_set

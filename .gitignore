@@ -3,3 +3,4 @@
 .coverage
 scripts/*
 test_coverage.cmd
+fp_tests/.idea/*

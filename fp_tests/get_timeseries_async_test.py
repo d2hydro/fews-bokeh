@@ -1,5 +1,5 @@
 from datetime import datetime
-from config import api
+from config import api, get_time_series_async
 
 LOCATION_IDS = ['NL34.HL.KGM154.LWZ1',
                 'NL34.HL.KGM154.HWZ1',
@@ -14,14 +14,15 @@ LOCATION_IDS = ['NL34.HL.KGM154.LWZ1',
                 'NL34.HL.KGM155.LWZ1']
 PARAMETER_IDS = ["Q [m3/s] [NVT] [OW]", "WATHTE [m] [NAP] [OW]"]
 
-timeseriesset = api.get_time_series(filter_id="WDB_OW_KGM",
-                                    location_ids=LOCATION_IDS,
-                                    start_time=datetime(2022, 5, 1),
-                                    end_time=datetime(2022, 5, 5),
-                                    parameter_ids=PARAMETER_IDS,
-                                    parallel=True)
+timeseriesset = get_time_series_async(url="https://www.hydrobase.nl/fews/nzv/FewsWebServices/rest/fewspiservice/v1/timeseries",
+                                      filter_id="WDB_OW_KGM",
+                                      location_ids=LOCATION_IDS,
+                                      start_time=datetime(2022, 5, 1),
+                                      end_time=datetime(2022, 5, 5),
+                                      parameter_ids=PARAMETER_IDS,
+                                      parallel=True)
 
-
+print(timeseriesset)
 def test_time_zone():
     assert timeseriesset.time_zone == 1.0
 
