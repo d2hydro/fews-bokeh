@@ -52,6 +52,8 @@ def get_time_series_async(
            """Get timerseries using FEWS (asynchronously)"""
            parameters["locationIds"] = [location_id]
            parameters["parameterIds"]= [parameter_id]
+           print(parameters["qualifierIds"])
+           parameters["qualifierIds"] = None
            try:
                response = await session.request(method='GET', url=url, params=parameters, verify_ssl=verify)
                print(response.url)
